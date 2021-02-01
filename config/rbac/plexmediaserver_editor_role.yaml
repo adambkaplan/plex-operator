@@ -1,0 +1,24 @@
+# permissions for end users to edit plexmediaservers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: plexmediaserver-editor-role
+rules:
+- apiGroups:
+  - plex.adambkaplan.com
+  resources:
+  - plexmediaservers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - plex.adambkaplan.com
+  resources:
+  - plexmediaservers/status
+  verbs:
+  - get

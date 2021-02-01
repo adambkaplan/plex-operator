@@ -1,0 +1,7 @@
+apiVersion: plex.adambkaplan.com/v1alpha1
+kind: PlexMediaServer
+metadata:
+  name: plexmediaserver-sample
+spec:
+  # Add fields here
+  foo: bar
