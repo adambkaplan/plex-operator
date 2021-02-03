@@ -18,6 +18,9 @@ type PlexMediaServerSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// Version is the version of Plex Media server deployed on the cluster
+	Version string `json:"version,omitempty"`
+
 	// ClaimToken is the claim token needed to register the Plex Media Server
 	ClaimToken string `json:"claimToken,omitempty"`
 }
