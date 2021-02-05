@@ -10,6 +10,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -58,17 +59,20 @@ func (r *PlexMediaServerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	reconciler := &reconcilers.StatefulSetReconciler{
-		Client: r.Client,
-		Log:    r.Log,
-		Scheme: r.Scheme,
+	reconcilers := []reconcilers.Reconciler{
+		reconcilers.NewServiceReconciler(r.Client, r.Log, r.Scheme),
+		reconcilers.NewStatefulSetReconciler(r.Client, r.Log, r.Scheme),
 	}
-	requeue, err := reconciler.Reconcile(ctx, plex)
-	if err != nil {
-		return ctrl.Result{Requeue: true}, err
+	requeueResult := false
+	for _, r := range reconcilers {
+		requeue, err := r.Reconcile(ctx, plex)
+		if err != nil {
+			return ctrl.Result{Requeue: true}, err
+		}
+		requeueResult = requeueResult || requeue
 	}
 
-	return ctrl.Result{Requeue: requeue}, nil
+	return ctrl.Result{Requeue: requeueResult}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

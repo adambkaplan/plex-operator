@@ -105,7 +105,7 @@ func (test *statefulSetReconcileSuite) TestStatefulSetReconcile() {
 			}
 			if tc.existingStatefulSet != nil {
 				err = ctrl.SetControllerReference(tc.plex, tc.existingStatefulSet, scheme)
-				test.Require().Nil(err, "failed to set controller reference")
+				test.Require().NoError(err, "failed to set controller reference")
 				builder.WithObjects(tc.existingStatefulSet)
 			}
 			client := builder.Build()
@@ -118,11 +118,13 @@ func (test *statefulSetReconcileSuite) TestStatefulSetReconcile() {
 			test.Equal(tc.expectRequeue, requeue, "requeue result should be equal")
 			if tc.expectError {
 				test.Error(err, "expected error was not returned")
+				return
 			}
 			updatedStatefulSet := &appsv1.StatefulSet{}
-			_ = client.Get(ctx, types.NamespacedName{Namespace: tc.plex.Namespace, Name: tc.plex.Name}, updatedStatefulSet)
+			err = client.Get(ctx, types.NamespacedName{Namespace: tc.plex.Namespace, Name: tc.plex.Name}, updatedStatefulSet)
+			test.Require().NoError(err, "failed to get StatefulSet")
 			test.True(equality.Semantic.DeepEqual(tc.expectedStatefulSet.Spec, updatedStatefulSet.Spec),
-				"statefulset %s does not match %s",
+				"expected statefulset\n\n%s\n\ndoes not match\n\n%s",
 				tc.expectedStatefulSet.Spec,
 				updatedStatefulSet.Spec)
 			test.True(plexOwnsStatefulSet(tc.plex, updatedStatefulSet),
@@ -165,6 +167,12 @@ func mockStatefulSet(namespace, name string, replicas int32, version string) *ap
 						{
 							Name:  "plex",
 							Image: fmt.Sprintf("docker.io/plexinc/pms-docker:%s", version),
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: int32(32400),
+									Protocol:      corev1.ProtocolTCP,
+								},
+							},
 						},
 					},
 				},

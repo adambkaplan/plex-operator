@@ -52,7 +52,7 @@ var _ = Describe("Default Deployment", func() {
 		BeforeEach(func() {
 			plexMediaServer = &plexv1alpha1.PlexMediaServer{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "test-ns",
+					Namespace: RandomName("default"),
 					Name:      "plex-server",
 				},
 				Spec: plexv1alpha1.PlexMediaServerSpec{
@@ -84,6 +84,56 @@ var _ = Describe("Default Deployment", func() {
 				expectedVersion = "latest"
 			}
 			Expect(firstContainer.Image).To(Equal(fmt.Sprintf("docker.io/plexinc/pms-docker:%s", expectedVersion)))
+		})
+
+		It("creates a Service to route requests to the Plex Media Server", func() {
+			By("checking the Service exposes the Plex Media Server port")
+			service := &corev1.Service{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plexMediaServer.Namespace, Name: plexMediaServer.Name}, service)
+				if err != nil {
+					return false
+				}
+				return true
+			}, retryTimeout, retryInterval).Should(BeTrue())
+			Expect(service).NotTo(BeNil())
+			Expect(service.Spec.Selector).To(BeEquivalentTo(map[string]string{
+				"plex.adambkaplan.com/instance": plexMediaServer.Name,
+			}))
+			foundPlex := false
+			for _, port := range service.Spec.Ports {
+				if port.Name == "plex" {
+					foundPlex = true
+					Expect(port.Port).To(BeEquivalentTo(32400))
+					Expect(port.Protocol).To(Equal(corev1.ProtocolTCP))
+					break
+				}
+			}
+			Expect(foundPlex).To(BeTrue())
+			By("checking the StatefulSet accepts traffic to the Plex Media Server Port")
+			statefulSet := &appsv1.StatefulSet{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plexMediaServer.Namespace, Name: plexMediaServer.Name}, statefulSet)
+				if err != nil {
+					return false
+				}
+				return true
+			}, retryTimeout, retryInterval).Should(BeTrue())
+			Expect(statefulSet).NotTo(BeNil())
+			foundPlex = false
+			for _, container := range statefulSet.Spec.Template.Spec.Containers {
+				if container.Name != "plex" {
+					continue
+				}
+				for _, port := range container.Ports {
+					if port.ContainerPort == int32(32400) {
+						foundPlex = true
+						Expect(port.Protocol).To(Equal(corev1.ProtocolTCP))
+						break
+					}
+				}
+			}
+			Expect(foundPlex).To(BeTrue())
 		})
 	})
 })

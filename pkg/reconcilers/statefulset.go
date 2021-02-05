@@ -27,6 +27,15 @@ type StatefulSetReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+// NewStatefulSetReconciler returns a Reconciler for Plex's StatefulSet
+func NewStatefulSetReconciler(client client.Client, log logr.Logger, scheme *runtime.Scheme) *StatefulSetReconciler {
+	return &StatefulSetReconciler{
+		Client: client,
+		Log:    log,
+		Scheme: scheme,
+	}
+}
+
 // Reconcile reconciles an object with the desired state of the PlexMediaServer
 func (r *StatefulSetReconciler) Reconcile(ctx context.Context, plex *plexv1alpha1.PlexMediaServer) (bool, error) {
 	origStatefulSet := &appsv1.StatefulSet{}
@@ -34,7 +43,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, plex *plexv1alpha
 	log := r.Log.WithValues("statefulset", namespacedName)
 	err := r.Client.Get(ctx, namespacedName, origStatefulSet)
 	if err != nil && errors.IsNotFound(err) {
-		origStatefulSet = createStatefulSet(plex, r.Scheme)
+		origStatefulSet = r.createStatefulSet(plex)
 		err = r.Client.Create(ctx, origStatefulSet, &client.CreateOptions{})
 		if err != nil {
 			log.Error(err, "failed to create object")
@@ -43,9 +52,13 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, plex *plexv1alpha
 		log.Info("created object")
 		return true, nil
 	}
+	if err != nil {
+		// Other errors, return true and force a requeue
+		return true, err
+	}
 
 	desiredStatefulSet := origStatefulSet.DeepCopy()
-	desiredStatefulSet.Spec = renderStatefulSetSpec(plex, origStatefulSet.Spec)
+	desiredStatefulSet.Spec = r.renderStatefulSetSpec(plex, desiredStatefulSet.Spec)
 
 	if !equality.Semantic.DeepEqual(origStatefulSet.Spec, desiredStatefulSet.Spec) {
 		err = r.Update(ctx, desiredStatefulSet, &client.UpdateOptions{})
@@ -60,22 +73,22 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, plex *plexv1alpha
 }
 
 // createStatefulSet creates a StatefulSet for the Plex media server
-func createStatefulSet(plex *plexv1alpha1.PlexMediaServer, scheme *runtime.Scheme) *appsv1.StatefulSet {
+func (r *StatefulSetReconciler) createStatefulSet(plex *plexv1alpha1.PlexMediaServer) *appsv1.StatefulSet {
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: plex.Namespace,
 			Name:      plex.Name,
 		},
 	}
-	statefulSet.Spec = renderStatefulSetSpec(plex, statefulSet.Spec)
-	ctrl.SetControllerReference(plex, statefulSet, scheme)
+	statefulSet.Spec = r.renderStatefulSetSpec(plex, statefulSet.Spec)
+	ctrl.SetControllerReference(plex, statefulSet, r.Scheme)
 	return statefulSet
 }
 
 // renderStatefulSetSpec renders a StatefulSet spec for the Plex Media Server on top of the
 // existing StatefulSetSpec. This ensures that the output StatefulSetSpec aligns with the settings
 // in the PlexMediaServer configuration.
-func renderStatefulSetSpec(plex *plexv1alpha1.PlexMediaServer, existingStatefulSet appsv1.StatefulSetSpec) appsv1.StatefulSetSpec {
+func (r *StatefulSetReconciler) renderStatefulSetSpec(plex *plexv1alpha1.PlexMediaServer, existingStatefulSet appsv1.StatefulSetSpec) appsv1.StatefulSetSpec {
 	replicas := int32(1)
 	existingStatefulSet.Replicas = &replicas
 	existingStatefulSet.Selector = &metav1.LabelSelector{
@@ -96,6 +109,12 @@ func renderStatefulSetSpec(plex *plexv1alpha1.PlexMediaServer, existingStatefulS
 	plexContainer := corev1.Container{
 		Name:  "plex",
 		Image: fmt.Sprintf("docker.io/plexinc/pms-docker:%s", version),
+		Ports: []corev1.ContainerPort{
+			{
+				ContainerPort: int32(32400),
+				Protocol:      corev1.ProtocolTCP,
+			},
+		},
 	}
 	containers = append(containers, plexContainer)
 	existingStatefulSet.Template.Spec.Containers = containers
