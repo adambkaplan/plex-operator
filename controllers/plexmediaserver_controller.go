@@ -13,12 +13,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	plexv1alpha1 "github.com/adambkaplan/plex-operator/api/v1alpha1"
-	"github.com/adambkaplan/plex-operator/pkg/statefulset"
+	"github.com/adambkaplan/plex-operator/pkg/reconcilers"
 )
 
 // PlexMediaServerReconciler reconciles a PlexMediaServer object
@@ -47,31 +46,29 @@ func (r *PlexMediaServerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// your logic here
 	r.Log.V(5).Info("reconciling PlexMediaServer")
-	plexMediaServer := &plexv1alpha1.PlexMediaServer{}
-	err := r.Client.Get(ctx, req.NamespacedName, plexMediaServer)
+	plex := &plexv1alpha1.PlexMediaServer{}
+	err := r.Client.Get(ctx, req.NamespacedName, plex)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Parent PlexMediaServer has been deleted
 			// PlexMediaServer adds owner refs to managed objects, which should be garbage collected by Kubernetes
 			return ctrl.Result{}, nil
 		}
-		// Requeue
+		// Requeue on error
 		return ctrl.Result{Requeue: true}, err
 	}
-	statefulSet := &appsv1.StatefulSet{}
-	err = r.Client.Get(ctx, types.NamespacedName{Namespace: plexMediaServer.Namespace, Name: plexMediaServer.Name}, statefulSet)
-	if err != nil && errors.IsNotFound(err) {
-		statefulSet = statefulset.CreateStatefulSet(plexMediaServer, r.Scheme)
-		err = r.Client.Create(ctx, statefulSet, &client.CreateOptions{})
-		if err != nil {
-			r.Log.WithValues("statefulset", types.NamespacedName{Namespace: statefulSet.Namespace, Name: statefulSet.Name}).Error(err, "failed to create object")
-			return ctrl.Result{Requeue: true}, err
-		}
-		r.Log.WithValues("statefulset", req.NamespacedName).Info("created object")
-		return ctrl.Result{}, nil
+
+	reconciler := &reconcilers.StatefulSetReconciler{
+		Client: r.Client,
+		Log:    r.Log,
+		Scheme: r.Scheme,
+	}
+	requeue, err := reconciler.Reconcile(ctx, plex)
+	if err != nil {
+		return ctrl.Result{Requeue: true}, err
 	}
 
-	return ctrl.Result{}, err
+	return ctrl.Result{Requeue: requeue}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
