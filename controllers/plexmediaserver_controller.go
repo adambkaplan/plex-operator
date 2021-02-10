@@ -44,10 +44,10 @@ type PlexMediaServerReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
 func (r *PlexMediaServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = r.Log.WithValues("plexmediaserver", req.NamespacedName)
+	log := r.Log.WithValues("plexmediaserver", req.NamespacedName)
 
 	// your logic here
-	r.Log.V(5).Info("reconciling PlexMediaServer")
+	log.Info("reconciling PlexMediaServer")
 	plex := &plexv1alpha1.PlexMediaServer{}
 	err := r.Client.Get(ctx, req.NamespacedName, plex)
 	if err != nil {
@@ -61,8 +61,8 @@ func (r *PlexMediaServerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	reconcilers := []reconcilers.Reconciler{
-		reconcilers.NewServiceReconciler(r.Client, r.Log, r.Scheme),
-		reconcilers.NewStatefulSetReconciler(r.Client, r.Log, r.Scheme),
+		reconcilers.NewServiceReconciler(r.Client, log, r.Scheme),
+		reconcilers.NewStatefulSetReconciler(r.Client, log, r.Scheme),
 	}
 	requeueResult := false
 	for _, r := range reconcilers {
