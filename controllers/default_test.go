@@ -12,12 +12,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	plexv1alpha1 "github.com/adambkaplan/plex-operator/api/v1alpha1"
 )
 
-var _ = Describe("Default Deployment", func() {
+var _ = Describe("Default deployment", func() {
 
 	var (
 		plexMediaServer *plexv1alpha1.PlexMediaServer
@@ -28,23 +27,11 @@ var _ = Describe("Default Deployment", func() {
 	)
 
 	JustBeforeEach(func() {
-		ctx = context.Background()
-		testNamespace = &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: plexMediaServer.Namespace,
-			},
-		}
-		err := k8sClient.Create(ctx, testNamespace, &client.CreateOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.Create(ctx, plexMediaServer, &client.CreateOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		ctx, testNamespace = InitTestEnvironment(k8sClient, plexMediaServer)
 	})
 
 	JustAfterEach(func() {
-		err := k8sClient.Delete(ctx, plexMediaServer, &client.DeleteOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.Delete(ctx, testNamespace, &client.DeleteOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		TearDownTestEnvironment(ctx, k8sClient, plexMediaServer, testNamespace)
 	})
 
 	When("a PlexMediaServer object is created", func() {
