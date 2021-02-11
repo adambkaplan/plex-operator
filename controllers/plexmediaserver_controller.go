@@ -12,6 +12,7 @@ import (
 	"github.com/go-logr/logr"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -72,7 +73,7 @@ func (r *PlexMediaServerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		requeueResult = requeueResult || requeue
 	}
-
+	log.WithValues("requeue", requeueResult).Info("finised reconcile")
 	return ctrl.Result{Requeue: requeueResult}, nil
 }
 
@@ -81,5 +82,6 @@ func (r *PlexMediaServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&plexv1alpha1.PlexMediaServer{}).
 		Owns(&appsv1.StatefulSet{}).
+		Owns(&corev1.Service{}).
 		Complete(r)
 }

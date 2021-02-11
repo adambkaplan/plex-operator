@@ -11,7 +11,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -25,6 +27,8 @@ type statefulSetTestCase struct {
 	plex                *v1alpha1.PlexMediaServer
 	existingStatefulSet *appsv1.StatefulSet
 	expectedStatefulSet *appsv1.StatefulSet
+	errCreate           error
+	errUpdate           error
 	expectError         bool
 	expectRequeue       bool
 }
@@ -45,7 +49,7 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 				},
 			},
 			expectRequeue:       true,
-			expectedStatefulSet: mockStatefulSet("test", "test", 1, "latest"),
+			expectedStatefulSet: mockStatefulSet("test", "test", 1, "latest", false),
 		},
 		{
 			name: "create with version",
@@ -59,7 +63,7 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 				},
 			},
 			expectRequeue:       true,
-			expectedStatefulSet: mockStatefulSet("test", "test-version", 1, "v1.21"),
+			expectedStatefulSet: mockStatefulSet("test", "test-version", 1, "v1.21", false),
 		},
 		{
 			name: "update with version",
@@ -72,8 +76,22 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 					Version: "v1.25",
 				},
 			},
-			existingStatefulSet: mockStatefulSet("update", "update-version", 1, "latest"),
-			expectedStatefulSet: mockStatefulSet("update", "update-version", 1, "v1.25"),
+			existingStatefulSet: mockStatefulSet("update", "update-version", 1, "latest", true),
+			expectedStatefulSet: mockStatefulSet("update", "update-version", 1, "v1.25", true),
+			expectRequeue:       true,
+		},
+		{
+			name: "update with conflict",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "no-change",
+					Name:      "no-change",
+				},
+			},
+			errUpdate:           errors.NewConflict(schema.ParseGroupResource("statefulset.apps"), "no-change", fmt.Errorf("test")),
+			existingStatefulSet: mockStatefulSet("no-change", "no-change", 1, "v1.23", true),
+			expectedStatefulSet: mockStatefulSet("no-change", "no-change", 1, "v1.23", true),
+			expectError:         false,
 			expectRequeue:       true,
 		},
 		{
@@ -84,8 +102,8 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 					Name:      "no-change",
 				},
 			},
-			existingStatefulSet: mockStatefulSet("no-change", "no-change", 1, "latest"),
-			expectedStatefulSet: mockStatefulSet("no-change", "no-change", 1, "latest"),
+			existingStatefulSet: mockStatefulSet("no-change", "no-change", 1, "latest", true),
+			expectedStatefulSet: mockStatefulSet("no-change", "no-change", 1, "latest", true),
 		},
 	}
 }
@@ -110,7 +128,11 @@ func (test *statefulSetReconcileSuite) TestStatefulSetReconcile() {
 			}
 			client := builder.Build()
 			reconciler := &StatefulSetReconciler{
-				Client: client,
+				Client: &errorClient{
+					Client:    client,
+					errCreate: tc.errCreate,
+					errUpdate: tc.errUpdate,
+				},
 				Scheme: client.Scheme(),
 				Log:    log,
 			}
@@ -143,8 +165,8 @@ func plexOwnsStatefulSet(plex *v1alpha1.PlexMediaServer, statefulSet *appsv1.Sta
 	return false
 }
 
-func mockStatefulSet(namespace, name string, replicas int32, version string) *appsv1.StatefulSet {
-	return &appsv1.StatefulSet{
+func mockStatefulSet(namespace, name string, replicas int32, version string, includeDefaults bool) *appsv1.StatefulSet {
+	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
@@ -169,6 +191,7 @@ func mockStatefulSet(namespace, name string, replicas int32, version string) *ap
 							Image: fmt.Sprintf("docker.io/plexinc/pms-docker:%s", version),
 							Ports: []corev1.ContainerPort{
 								{
+									Name:          "plex",
 									ContainerPort: int32(32400),
 									Protocol:      corev1.ProtocolTCP,
 								},
@@ -179,6 +202,14 @@ func mockStatefulSet(namespace, name string, replicas int32, version string) *ap
 			},
 		},
 	}
+	if includeDefaults {
+		plexContainer := statefulSet.Spec.Template.Spec.Containers[0]
+		plexContainer.ImagePullPolicy = corev1.PullAlways
+		plexContainer.TerminationMessagePolicy = corev1.TerminationMessageReadFile
+		plexContainer.TerminationMessagePath = "/dev/termination-log"
+		statefulSet.Spec.Template.Spec.Containers[0] = plexContainer
+	}
+	return statefulSet
 }
 
 func TestStatefulSetSuite(t *testing.T) {

@@ -39,6 +39,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, plex *v1alpha1.PlexMe
 	log := r.Log.WithValues("service", namespacedName)
 	err := r.Client.Get(ctx, namespacedName, origService)
 	if err != nil && errors.IsNotFound(err) {
+		log.Info("creating")
 		origService = r.createService(plex)
 		err = r.Client.Create(ctx, origService, &client.CreateOptions{})
 		if err != nil {
@@ -54,11 +55,17 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, plex *v1alpha1.PlexMe
 	desiredService := origService.DeepCopy()
 	desiredService.Spec = r.renderServiceSpec(plex, desiredService.Spec)
 	if !equality.Semantic.DeepEqual(origService.Spec, desiredService.Spec) {
+		log.Info("updating")
 		err = r.Update(ctx, desiredService, &client.UpdateOptions{})
+		if errors.IsConflict(err) {
+			log.Info("conflict on update, requeueing")
+			return true, nil
+		}
 		if err != nil {
 			log.Error(err, "failed to update object")
 			return true, err
 		}
+		log.Info("updated object")
 		return true, nil
 	}
 
@@ -81,12 +88,21 @@ func (r *ServiceReconciler) renderServiceSpec(plex *v1alpha1.PlexMediaServer, ex
 	existingService.Selector = map[string]string{
 		"plex.adambkaplan.com/instance": plex.Name,
 	}
-	existingService.Ports = []corev1.ServicePort{
-		{
-			Name:     "plex",
-			Port:     int32(32400),
-			Protocol: corev1.ProtocolTCP,
-		},
-	}
+	existingService.Ports = r.renderServicePorts(existingService.Ports)
 	return existingService
+}
+
+func (r *ServiceReconciler) renderServicePorts(existing []corev1.ServicePort) []corev1.ServicePort {
+	servicePorts := []corev1.ServicePort{}
+	plexPort := corev1.ServicePort{}
+	for _, port := range existing {
+		if port.Port == int32(32400) {
+			plexPort = port
+		}
+	}
+	plexPort.Port = int32(32400)
+	plexPort.Protocol = corev1.ProtocolTCP
+	plexPort.Name = "plex"
+	servicePorts = append(servicePorts, plexPort)
+	return servicePorts
 }

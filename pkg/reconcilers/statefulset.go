@@ -43,6 +43,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, plex *plexv1alpha
 	log := r.Log.WithValues("statefulset", namespacedName)
 	err := r.Client.Get(ctx, namespacedName, origStatefulSet)
 	if err != nil && errors.IsNotFound(err) {
+		log.Info("creating")
 		origStatefulSet = r.createStatefulSet(plex)
 		err = r.Client.Create(ctx, origStatefulSet, &client.CreateOptions{})
 		if err != nil {
@@ -61,7 +62,12 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, plex *plexv1alpha
 	desiredStatefulSet.Spec = r.renderStatefulSetSpec(plex, desiredStatefulSet.Spec)
 
 	if !equality.Semantic.DeepEqual(origStatefulSet.Spec, desiredStatefulSet.Spec) {
+		log.Info("updating")
 		err = r.Update(ctx, desiredStatefulSet, &client.UpdateOptions{})
+		if errors.IsConflict(err) {
+			log.Info("conflict on update, requeueing")
+			return true, nil
+		}
 		if err != nil {
 			log.Error(err, "failed to update object")
 			return true, err
@@ -106,17 +112,38 @@ func (r *StatefulSetReconciler) renderStatefulSetSpec(plex *plexv1alpha1.PlexMed
 	if version == "" {
 		version = "latest"
 	}
-	plexContainer := corev1.Container{
-		Name:  "plex",
-		Image: fmt.Sprintf("docker.io/plexinc/pms-docker:%s", version),
-		Ports: []corev1.ContainerPort{
-			{
-				ContainerPort: int32(32400),
-				Protocol:      corev1.ProtocolTCP,
-			},
-		},
-	}
+	plexContainer := r.findPlexContainer(existingStatefulSet.Template.Spec.Containers)
+	plexContainer.Image = fmt.Sprintf("docker.io/plexinc/pms-docker:%s", version)
+	plexContainer.Ports = r.renderPlexContainerPorts(plexContainer.Ports)
 	containers = append(containers, plexContainer)
 	existingStatefulSet.Template.Spec.Containers = containers
 	return existingStatefulSet
+}
+
+func (r *StatefulSetReconciler) findPlexContainer(existing []corev1.Container) corev1.Container {
+	plexContainer := corev1.Container{
+		Name: "plex",
+	}
+	for _, container := range existing {
+		if container.Name == "plex" {
+			plexContainer = container
+			break
+		}
+	}
+	return plexContainer
+}
+
+func (r *StatefulSetReconciler) renderPlexContainerPorts(existing []corev1.ContainerPort) []corev1.ContainerPort {
+	containerPorts := []corev1.ContainerPort{}
+	plexPort := corev1.ContainerPort{}
+	for _, port := range existing {
+		if port.ContainerPort == int32(32400) {
+			plexPort = port
+		}
+	}
+	plexPort.ContainerPort = int32(32400)
+	plexPort.Name = "plex"
+	plexPort.Protocol = corev1.ProtocolTCP
+	containerPorts = append(containerPorts, plexPort)
+	return containerPorts
 }
