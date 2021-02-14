@@ -49,7 +49,7 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 				},
 			},
 			expectRequeue:       true,
-			expectedStatefulSet: mockStatefulSet("test", "test", 1, "latest", false),
+			expectedStatefulSet: mockStatefulSet("test", "test", 1, "latest", false, false),
 		},
 		{
 			name: "create with version",
@@ -63,7 +63,7 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 				},
 			},
 			expectRequeue:       true,
-			expectedStatefulSet: mockStatefulSet("test", "test-version", 1, "v1.21", false),
+			expectedStatefulSet: mockStatefulSet("test", "test-version", 1, "v1.21", false, false),
 		},
 		{
 			name: "update with version",
@@ -76,8 +76,8 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 					Version: "v1.25",
 				},
 			},
-			existingStatefulSet: mockStatefulSet("update", "update-version", 1, "latest", true),
-			expectedStatefulSet: mockStatefulSet("update", "update-version", 1, "v1.25", true),
+			existingStatefulSet: mockStatefulSet("update", "update-version", 1, "latest", true, false),
+			expectedStatefulSet: mockStatefulSet("update", "update-version", 1, "v1.25", true, false),
 			expectRequeue:       true,
 		},
 		{
@@ -89,8 +89,8 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 				},
 			},
 			errUpdate:           errors.NewConflict(schema.ParseGroupResource("statefulset.apps"), "no-change", fmt.Errorf("test")),
-			existingStatefulSet: mockStatefulSet("no-change", "no-change", 1, "v1.23", true),
-			expectedStatefulSet: mockStatefulSet("no-change", "no-change", 1, "v1.23", true),
+			existingStatefulSet: mockStatefulSet("no-change", "no-change", 1, "v1.23", true, false),
+			expectedStatefulSet: mockStatefulSet("no-change", "no-change", 1, "v1.23", true, false),
 			expectError:         false,
 			expectRequeue:       true,
 		},
@@ -102,8 +102,8 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 					Name:      "no-change",
 				},
 			},
-			existingStatefulSet: mockStatefulSet("no-change", "no-change", 1, "latest", true),
-			expectedStatefulSet: mockStatefulSet("no-change", "no-change", 1, "latest", true),
+			existingStatefulSet: mockStatefulSet("no-change", "no-change", 1, "latest", true, true),
+			expectedStatefulSet: mockStatefulSet("no-change", "no-change", 1, "latest", true, true),
 		},
 	}
 }
@@ -165,7 +165,7 @@ func plexOwnsStatefulSet(plex *v1alpha1.PlexMediaServer, statefulSet *appsv1.Sta
 	return false
 }
 
-func mockStatefulSet(namespace, name string, replicas int32, version string, includeDefaults bool) *appsv1.StatefulSet {
+func mockStatefulSet(namespace, name string, replicas int32, version string, includeDefaults bool, ready bool) *appsv1.StatefulSet {
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
@@ -208,6 +208,10 @@ func mockStatefulSet(namespace, name string, replicas int32, version string, inc
 		plexContainer.TerminationMessagePolicy = corev1.TerminationMessageReadFile
 		plexContainer.TerminationMessagePath = "/dev/termination-log"
 		statefulSet.Spec.Template.Spec.Containers[0] = plexContainer
+	}
+	if ready {
+		statefulSet.Status.Replicas = replicas
+		statefulSet.Status.ReadyReplicas = replicas
 	}
 	return statefulSet
 }

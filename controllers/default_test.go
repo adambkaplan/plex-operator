@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -13,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/adambkaplan/plex-operator/api/v1alpha1"
 	plexv1alpha1 "github.com/adambkaplan/plex-operator/api/v1alpha1"
 )
 
@@ -121,6 +124,36 @@ var _ = Describe("Default deployment", func() {
 				}
 			}
 			Expect(foundPlex).To(BeTrue())
+		})
+		It("updates the Ready status based on the StatefulSet", func() {
+			By("checking the Ready status is false if the StatefulSet is not ready")
+			statefulSet := &appsv1.StatefulSet{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plexMediaServer.Namespace, Name: plexMediaServer.Name}, statefulSet)
+				if err != nil {
+					return false
+				}
+				return true
+			}, retryTimeout, retryInterval).Should(BeTrue())
+			Expect(statefulSet).NotTo(BeNil())
+			Expect(statefulSet.Status.ReadyReplicas).To(BeNumerically("<", 1))
+			currentPlex := &v1alpha1.PlexMediaServer{}
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plexMediaServer.Namespace, Name: plexMediaServer.Name}, currentPlex)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(meta.IsStatusConditionFalse(currentPlex.Status.Conditions, "Ready")).To(BeTrue())
+
+			By("checking the Ready status is true if the StatefulSet has one ready replica")
+			statefulSet.Status.Replicas = 1
+			statefulSet.Status.ReadyReplicas = 1
+			err = k8sClient.Status().Update(ctx, statefulSet, &client.UpdateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plexMediaServer.Namespace, Name: plexMediaServer.Name}, currentPlex)
+				if err != nil {
+					return false
+				}
+				return meta.IsStatusConditionTrue(currentPlex.Status.Conditions, "Ready")
+			}).Should(BeTrue())
 		})
 	})
 })

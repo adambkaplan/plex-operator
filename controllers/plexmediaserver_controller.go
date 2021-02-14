@@ -49,8 +49,8 @@ func (r *PlexMediaServerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// your logic here
 	log.Info("reconciling PlexMediaServer")
-	plex := &plexv1alpha1.PlexMediaServer{}
-	err := r.Client.Get(ctx, req.NamespacedName, plex)
+	currentPlex := &plexv1alpha1.PlexMediaServer{}
+	err := r.Client.Get(ctx, req.NamespacedName, currentPlex)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Parent PlexMediaServer has been deleted
@@ -64,8 +64,10 @@ func (r *PlexMediaServerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	reconcilers := []reconcilers.Reconciler{
 		reconcilers.NewServiceReconciler(r.Client, log, r.Scheme),
 		reconcilers.NewStatefulSetReconciler(r.Client, log, r.Scheme),
+		reconcilers.NewStatusReconciler(r.Client, log, r.Scheme),
 	}
 	requeueResult := false
+	plex := currentPlex.DeepCopy()
 	for _, r := range reconcilers {
 		requeue, err := r.Reconcile(ctx, plex)
 		if err != nil {

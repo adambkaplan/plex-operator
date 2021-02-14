@@ -19,9 +19,11 @@ type PlexMediaServerSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Version is the version of Plex Media server deployed on the cluster
+	// +optional
 	Version string `json:"version,omitempty"`
 
 	// ClaimToken is the claim token needed to register the Plex Media Server
+	// +optional
 	ClaimToken string `json:"claimToken,omitempty"`
 }
 
@@ -30,7 +32,12 @@ type PlexMediaServerStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// ObservedGeneration is the generation last observed by the controller
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Conditions reports the condition of the Plex Media Server
+	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
