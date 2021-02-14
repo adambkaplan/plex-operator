@@ -97,6 +97,7 @@ func (r *StatefulSetReconciler) createStatefulSet(plex *plexv1alpha1.PlexMediaSe
 func (r *StatefulSetReconciler) renderStatefulSetSpec(plex *plexv1alpha1.PlexMediaServer, existingStatefulSet appsv1.StatefulSetSpec) appsv1.StatefulSetSpec {
 	replicas := int32(1)
 	existingStatefulSet.Replicas = &replicas
+	existingStatefulSet.ServiceName = plex.Name
 	existingStatefulSet.Selector = &metav1.LabelSelector{
 		MatchLabels: map[string]string{
 			"plex.adambkaplan.com/instance": plex.Name,

@@ -88,6 +88,7 @@ func (r *ServiceReconciler) renderServiceSpec(plex *v1alpha1.PlexMediaServer, ex
 	existingService.Selector = map[string]string{
 		"plex.adambkaplan.com/instance": plex.Name,
 	}
+	existingService.ClusterIP = corev1.ClusterIPNone
 	existingService.Ports = r.renderServicePorts(existingService.Ports)
 	return existingService
 }

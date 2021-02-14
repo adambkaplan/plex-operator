@@ -76,7 +76,7 @@ var _ = Describe("Default deployment", func() {
 			Expect(firstContainer.Image).To(Equal(fmt.Sprintf("docker.io/plexinc/pms-docker:%s", expectedVersion)))
 		})
 
-		It("creates a Service to route requests to the Plex Media Server", func() {
+		It("creates a headless Service to route requests to the Plex Media Server", func() {
 			By("checking the Service exposes the Plex Media Server port")
 			service := &corev1.Service{}
 			Eventually(func() bool {
@@ -90,6 +90,7 @@ var _ = Describe("Default deployment", func() {
 			Expect(service.Spec.Selector).To(BeEquivalentTo(map[string]string{
 				"plex.adambkaplan.com/instance": plexMediaServer.Name,
 			}))
+			Expect(service.Spec.ClusterIP).To(Equal(corev1.ClusterIPNone))
 			foundPlex := false
 			for _, port := range service.Spec.Ports {
 				if port.Name == "plex" {
@@ -110,6 +111,7 @@ var _ = Describe("Default deployment", func() {
 				return true
 			}, retryTimeout, retryInterval).Should(BeTrue())
 			Expect(statefulSet).NotTo(BeNil())
+			Expect(statefulSet.Spec.ServiceName).To(Equal(plexMediaServer.Name))
 			foundPlex = false
 			for _, container := range statefulSet.Spec.Template.Spec.Containers {
 				if container.Name != "plex" {

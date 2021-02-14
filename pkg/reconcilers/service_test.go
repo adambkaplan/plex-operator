@@ -2,6 +2,7 @@ package reconcilers
 
 import (
 	"context"
+	"testing"
 
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/suite"
@@ -70,6 +71,9 @@ func (test *serviceReconcileSuite) TestServiceReconcile() {
 			if tc.plex != nil {
 				builder.WithObjects(tc.plex)
 			}
+			if tc.existingService != nil {
+				builder.WithObjects(tc.existingService)
+			}
 			client := builder.Build()
 			reconciler := &ServiceReconciler{
 				Client: client,
@@ -104,6 +108,7 @@ func mockService(namespace, name string) *corev1.Service {
 			Selector: map[string]string{
 				"plex.adambkaplan.com/instance": name,
 			},
+			ClusterIP: corev1.ClusterIPNone,
 			Ports: []corev1.ServicePort{
 				{
 					Name:     "plex",
@@ -114,4 +119,8 @@ func mockService(namespace, name string) *corev1.Service {
 		},
 	}
 
+}
+
+func TestServiceSuite(t *testing.T) {
+	suite.Run(t, new(serviceReconcileSuite))
 }

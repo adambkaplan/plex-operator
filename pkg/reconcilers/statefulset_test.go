@@ -177,7 +177,8 @@ func mockStatefulSet(namespace, name string, replicas int32, version string, inc
 					"plex.adambkaplan.com/instance": name,
 				},
 			},
-			Replicas: &replicas,
+			Replicas:    &replicas,
+			ServiceName: name,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
