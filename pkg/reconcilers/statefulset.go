@@ -116,8 +116,10 @@ func (r *StatefulSetReconciler) renderStatefulSetSpec(plex *plexv1alpha1.PlexMed
 	plexContainer := r.findPlexContainer(existingStatefulSet.Template.Spec.Containers)
 	plexContainer.Image = fmt.Sprintf("docker.io/plexinc/pms-docker:%s", version)
 	plexContainer.Ports = r.renderPlexContainerPorts(plexContainer.Ports)
+	plexContainer.VolumeMounts = r.renderPlexContainerVolumeMounts(plexContainer.VolumeMounts)
 	containers = append(containers, plexContainer)
 	existingStatefulSet.Template.Spec.Containers = containers
+	existingStatefulSet.Template.Spec.Volumes = r.renderPlexVolumes(existingStatefulSet.Template.Spec.Volumes)
 	return existingStatefulSet
 }
 
@@ -140,11 +142,69 @@ func (r *StatefulSetReconciler) renderPlexContainerPorts(existing []corev1.Conta
 	for _, port := range existing {
 		if port.ContainerPort == int32(32400) {
 			plexPort = port
+			continue
 		}
+		// Append any other ContainerPorts to the returned slice
+		containerPorts = append(containerPorts, port)
 	}
 	plexPort.ContainerPort = int32(32400)
 	plexPort.Name = "plex"
 	plexPort.Protocol = corev1.ProtocolTCP
 	containerPorts = append(containerPorts, plexPort)
 	return containerPorts
+}
+
+func (r *StatefulSetReconciler) renderPlexContainerVolumeMounts(existing []corev1.VolumeMount) []corev1.VolumeMount {
+	volumeMounts := []corev1.VolumeMount{}
+	configMount := corev1.VolumeMount{Name: "config"}
+	transcodeMount := corev1.VolumeMount{Name: "transcode"}
+	dataMount := corev1.VolumeMount{Name: "data"}
+	for _, mount := range existing {
+		if mount.Name == "config" {
+			configMount = mount
+			continue
+		}
+		if mount.Name == "transcode" {
+			transcodeMount = mount
+			continue
+		}
+		if mount.Name == "data" {
+			dataMount = mount
+			continue
+		}
+		// Append any other volume mounts to the returned slice
+		volumeMounts = append(volumeMounts, mount)
+	}
+	configMount.MountPath = "/config"
+	transcodeMount.MountPath = "/transcode"
+	dataMount.MountPath = "/data"
+	volumeMounts = append(volumeMounts, configMount, transcodeMount, dataMount)
+	return volumeMounts
+}
+
+func (r *StatefulSetReconciler) renderPlexVolumes(existing []corev1.Volume) []corev1.Volume {
+	volumes := []corev1.Volume{}
+	configVolume := corev1.Volume{Name: "config"}
+	transcodeVolume := corev1.Volume{Name: "transcode"}
+	dataVolume := corev1.Volume{Name: "data"}
+	for _, volume := range existing {
+		if volume.Name == "config" {
+			configVolume = volume
+			continue
+		}
+		if volume.Name == "transcode" {
+			transcodeVolume = volume
+			continue
+		}
+		if volume.Name == "data" {
+			dataVolume = volume
+			continue
+		}
+		volumes = append(volumes, volume)
+	}
+	configVolume.EmptyDir = &corev1.EmptyDirVolumeSource{}
+	transcodeVolume.EmptyDir = &corev1.EmptyDirVolumeSource{}
+	dataVolume.EmptyDir = &corev1.EmptyDirVolumeSource{}
+	volumes = append(volumes, configVolume, transcodeVolume, dataVolume)
+	return volumes
 }

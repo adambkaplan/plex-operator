@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/suite"
 
@@ -146,9 +148,8 @@ func (test *statefulSetReconcileSuite) TestStatefulSetReconcile() {
 			err = client.Get(ctx, types.NamespacedName{Namespace: tc.plex.Namespace, Name: tc.plex.Name}, updatedStatefulSet)
 			test.Require().NoError(err, "failed to get StatefulSet")
 			test.True(equality.Semantic.DeepEqual(tc.expectedStatefulSet.Spec, updatedStatefulSet.Spec),
-				"expected statefulset\n\n%s\n\ndoes not match\n\n%s",
-				tc.expectedStatefulSet.Spec,
-				updatedStatefulSet.Spec)
+				"expected statefulSet does not match - diff: %s",
+				cmp.Diff(tc.expectedStatefulSet.Spec, updatedStatefulSet.Spec))
 			test.True(plexOwnsStatefulSet(tc.plex, updatedStatefulSet),
 				"statefulSet not owned by plex. Owner references: %s",
 				updatedStatefulSet.OwnerReferences)
@@ -196,6 +197,40 @@ func mockStatefulSet(namespace, name string, replicas int32, version string, inc
 									ContainerPort: int32(32400),
 									Protocol:      corev1.ProtocolTCP,
 								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "config",
+									MountPath: "/config",
+								},
+								{
+									Name:      "transcode",
+									MountPath: "/transcode",
+								},
+								{
+									Name:      "data",
+									MountPath: "/data",
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "config",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+						{
+							Name: "transcode",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+						{
+							Name: "data",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
 							},
 						},
 					},

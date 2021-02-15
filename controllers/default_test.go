@@ -53,6 +53,7 @@ var _ = Describe("Default deployment", func() {
 
 		It("creates a StatefulSet to deploy the Plex media server", func() {
 			statefulSet := &appsv1.StatefulSet{}
+			By("checking the StatefulSet exists")
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plexMediaServer.Namespace, Name: plexMediaServer.Name}, statefulSet)
 				if err != nil {
@@ -66,6 +67,7 @@ var _ = Describe("Default deployment", func() {
 					"plex.adambkaplan.com/instance": plexMediaServer.Name,
 				},
 			}))
+			By("checking the StatefulSet's first container config")
 			Expect(len(statefulSet.Spec.Template.Spec.Containers)).To(Equal(1))
 			firstContainer := statefulSet.Spec.Template.Spec.Containers[0]
 			Expect(firstContainer.Name).To(Equal("plex"))
@@ -74,6 +76,47 @@ var _ = Describe("Default deployment", func() {
 				expectedVersion = "latest"
 			}
 			Expect(firstContainer.Image).To(Equal(fmt.Sprintf("docker.io/plexinc/pms-docker:%s", expectedVersion)))
+			foundConfig := false
+			foundTranscode := false
+			foundData := false
+			for _, mount := range firstContainer.VolumeMounts {
+				if mount.Name == "config" {
+					foundConfig = true
+					Expect(mount.MountPath).To(Equal("/config"))
+				}
+				if mount.Name == "transcode" {
+					foundTranscode = true
+					Expect(mount.MountPath).To(Equal("/transcode"))
+				}
+				if mount.Name == "data" {
+					foundData = true
+					Expect(mount.MountPath).To(Equal("/data"))
+				}
+			}
+			Expect(foundConfig).To(BeTrue())
+			Expect(foundTranscode).To(BeTrue())
+			Expect(foundData).To(BeTrue())
+			By("checking the StatefulSet's default volumes")
+			foundConfig = false
+			foundTranscode = false
+			foundData = false
+			for _, volume := range statefulSet.Spec.Template.Spec.Volumes {
+				if volume.Name == "config" {
+					foundConfig = true
+					Expect(volume.EmptyDir).NotTo(BeNil())
+				}
+				if volume.Name == "transcode" {
+					foundTranscode = true
+					Expect(volume.EmptyDir).NotTo(BeNil())
+				}
+				if volume.Name == "data" {
+					foundData = true
+					Expect(volume.EmptyDir).NotTo(BeNil())
+				}
+			}
+			Expect(foundConfig).To(BeTrue())
+			Expect(foundTranscode).To(BeTrue())
+			Expect(foundData).To(BeTrue())
 		})
 
 		It("creates a headless Service to route requests to the Plex Media Server", func() {
