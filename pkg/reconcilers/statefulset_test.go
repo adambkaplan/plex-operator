@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -23,6 +24,137 @@ import (
 
 	"github.com/adambkaplan/plex-operator/api/v1alpha1"
 )
+
+type statefulSetDoubleOptions struct {
+	Replicas        int32
+	Version         string
+	IncludeDefaults bool
+	Ready           bool
+	ConfigVolume    *corev1.PersistentVolumeClaimSpec
+	TranscodeVolume *corev1.PersistentVolumeClaimSpec
+	DataVolume      *corev1.PersistentVolumeClaimSpec
+}
+
+func doubleStatefulSet(namespace, name string, options statefulSetDoubleOptions) *appsv1.StatefulSet {
+	if options.Version == "" {
+		options.Version = "latest"
+	}
+	if options.Ready && options.Replicas < 1 {
+		options.Replicas = 1
+	}
+	statefulSet := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"plex.adambkaplan.com/instance": name,
+				},
+			},
+			Replicas:    &options.Replicas,
+			ServiceName: name,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"plex.adambkaplan.com/instance": name,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "plex",
+							Image: fmt.Sprintf("docker.io/plexinc/pms-docker:%s", options.Version),
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "plex",
+									ContainerPort: int32(32400),
+									Protocol:      corev1.ProtocolTCP,
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "config",
+									MountPath: "/config",
+								},
+								{
+									Name:      "transcode",
+									MountPath: "/transcode",
+								},
+								{
+									Name:      "data",
+									MountPath: "/data",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	podVolumes := []corev1.Volume{}
+	volumeClaimTemplates := []corev1.PersistentVolumeClaim{}
+	if options.ConfigVolume == nil {
+		podVolumes = append(podVolumes, corev1.Volume{
+			Name: "config",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		})
+	} else {
+		volumeClaimTemplates = append(volumeClaimTemplates, corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "config",
+			},
+			Spec: *options.ConfigVolume,
+		})
+	}
+	if options.TranscodeVolume == nil {
+		podVolumes = append(podVolumes, corev1.Volume{
+			Name: "transcode",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		})
+	} else {
+		volumeClaimTemplates = append(volumeClaimTemplates, corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "transcode",
+			},
+			Spec: *options.TranscodeVolume,
+		})
+	}
+	if options.DataVolume == nil {
+		podVolumes = append(podVolumes, corev1.Volume{
+			Name: "data",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		})
+	} else {
+		volumeClaimTemplates = append(volumeClaimTemplates, corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "data",
+			},
+			Spec: *options.DataVolume,
+		})
+	}
+	statefulSet.Spec.Template.Spec.Volumes = podVolumes
+	statefulSet.Spec.VolumeClaimTemplates = volumeClaimTemplates
+	if options.IncludeDefaults {
+		plexContainer := statefulSet.Spec.Template.Spec.Containers[0]
+		plexContainer.ImagePullPolicy = corev1.PullAlways
+		plexContainer.TerminationMessagePolicy = corev1.TerminationMessageReadFile
+		plexContainer.TerminationMessagePath = "/dev/termination-log"
+		statefulSet.Spec.Template.Spec.Containers[0] = plexContainer
+	}
+	if options.Ready {
+		statefulSet.Status.Replicas = options.Replicas
+		statefulSet.Status.ReadyReplicas = options.Replicas
+	}
+	return statefulSet
+}
 
 type statefulSetTestCase struct {
 	name                string
@@ -50,8 +182,10 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 					Name:      "test",
 				},
 			},
-			expectRequeue:       true,
-			expectedStatefulSet: mockStatefulSet("test", "test", 1, "latest", false, false),
+			expectRequeue: true,
+			expectedStatefulSet: doubleStatefulSet("test", "test", statefulSetDoubleOptions{
+				Replicas: 1,
+			}),
 		},
 		{
 			name: "create with version",
@@ -64,8 +198,101 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 					Version: "v1.21",
 				},
 			},
-			expectRequeue:       true,
-			expectedStatefulSet: mockStatefulSet("test", "test-version", 1, "v1.21", false, false),
+			expectRequeue: true,
+			expectedStatefulSet: doubleStatefulSet("test", "test-version", statefulSetDoubleOptions{
+				Replicas: 1,
+				Version:  "v1.21",
+			}),
+		},
+		{
+			name: "create with one persistent volume",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+					Name:      "test-volume",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Storage: v1alpha1.PlexMediaServerStorageSpec{
+						Config: &v1alpha1.PlexStorageOptions{
+							AccessMode: corev1.ReadWriteOnce,
+							Capacity:   resource.MustParse("10Gi"),
+						},
+					},
+				},
+			},
+			expectRequeue: true,
+			expectedStatefulSet: doubleStatefulSet("test", "test-volume", statefulSetDoubleOptions{
+				Replicas: 1,
+				ConfigVolume: &corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("10Gi"),
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "create with all persistent volumes",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+					Name:      "test-volume",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Storage: v1alpha1.PlexMediaServerStorageSpec{
+						Config: &v1alpha1.PlexStorageOptions{
+							AccessMode: corev1.ReadWriteOnce,
+							Capacity:   resource.MustParse("10Gi"),
+						},
+						Transcode: &v1alpha1.PlexStorageOptions{
+							AccessMode: corev1.ReadWriteOnce,
+							Capacity:   resource.MustParse("10Gi"),
+						},
+						Data: &v1alpha1.PlexStorageOptions{
+							AccessMode: corev1.ReadWriteMany,
+							Capacity:   resource.MustParse("100Gi"),
+						},
+					},
+				},
+			},
+			expectRequeue: true,
+			expectedStatefulSet: doubleStatefulSet("test", "test-volume", statefulSetDoubleOptions{
+				Replicas: 1,
+				ConfigVolume: &corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("10Gi"),
+						},
+					},
+				},
+				TranscodeVolume: &corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("10Gi"),
+						},
+					},
+				},
+				DataVolume: &corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteMany,
+					},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("100Gi"),
+						},
+					},
+				},
+			}),
 		},
 		{
 			name: "update with version",
@@ -78,9 +305,16 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 					Version: "v1.25",
 				},
 			},
-			existingStatefulSet: mockStatefulSet("update", "update-version", 1, "latest", true, false),
-			expectedStatefulSet: mockStatefulSet("update", "update-version", 1, "v1.25", true, false),
-			expectRequeue:       true,
+			existingStatefulSet: doubleStatefulSet("update", "update-version", statefulSetDoubleOptions{
+				Replicas:        1,
+				IncludeDefaults: true,
+			}),
+			expectedStatefulSet: doubleStatefulSet("update", "update-version", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "v1.25",
+				IncludeDefaults: true,
+			}),
+			expectRequeue: true,
 		},
 		{
 			name: "update with conflict",
@@ -90,11 +324,19 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 					Name:      "no-change",
 				},
 			},
-			errUpdate:           errors.NewConflict(schema.ParseGroupResource("statefulset.apps"), "no-change", fmt.Errorf("test")),
-			existingStatefulSet: mockStatefulSet("no-change", "no-change", 1, "v1.23", true, false),
-			expectedStatefulSet: mockStatefulSet("no-change", "no-change", 1, "v1.23", true, false),
-			expectError:         false,
-			expectRequeue:       true,
+			errUpdate: errors.NewConflict(schema.ParseGroupResource("statefulset.apps"), "no-change", fmt.Errorf("test")),
+			existingStatefulSet: doubleStatefulSet("no-change", "no-change", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "v1.23",
+				IncludeDefaults: true,
+			}),
+			expectedStatefulSet: doubleStatefulSet("no-change", "no-change", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "v1.23",
+				IncludeDefaults: true,
+			}),
+			expectError:   false,
+			expectRequeue: true,
 		},
 		{
 			name: "no change",
@@ -104,8 +346,14 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 					Name:      "no-change",
 				},
 			},
-			existingStatefulSet: mockStatefulSet("no-change", "no-change", 1, "latest", true, true),
-			expectedStatefulSet: mockStatefulSet("no-change", "no-change", 1, "latest", true, true),
+			existingStatefulSet: doubleStatefulSet("no-change", "no-change", statefulSetDoubleOptions{
+				Replicas:        1,
+				IncludeDefaults: true,
+			}),
+			expectedStatefulSet: doubleStatefulSet("no-change", "no-change", statefulSetDoubleOptions{
+				Replicas:        1,
+				IncludeDefaults: true,
+			}),
 		},
 	}
 }
@@ -164,92 +412,6 @@ func plexOwnsStatefulSet(plex *v1alpha1.PlexMediaServer, statefulSet *appsv1.Sta
 		}
 	}
 	return false
-}
-
-func mockStatefulSet(namespace, name string, replicas int32, version string, includeDefaults bool, ready bool) *appsv1.StatefulSet {
-	statefulSet := &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-		},
-		Spec: appsv1.StatefulSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"plex.adambkaplan.com/instance": name,
-				},
-			},
-			Replicas:    &replicas,
-			ServiceName: name,
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"plex.adambkaplan.com/instance": name,
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "plex",
-							Image: fmt.Sprintf("docker.io/plexinc/pms-docker:%s", version),
-							Ports: []corev1.ContainerPort{
-								{
-									Name:          "plex",
-									ContainerPort: int32(32400),
-									Protocol:      corev1.ProtocolTCP,
-								},
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "config",
-									MountPath: "/config",
-								},
-								{
-									Name:      "transcode",
-									MountPath: "/transcode",
-								},
-								{
-									Name:      "data",
-									MountPath: "/data",
-								},
-							},
-						},
-					},
-					Volumes: []corev1.Volume{
-						{
-							Name: "config",
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{},
-							},
-						},
-						{
-							Name: "transcode",
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{},
-							},
-						},
-						{
-							Name: "data",
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	if includeDefaults {
-		plexContainer := statefulSet.Spec.Template.Spec.Containers[0]
-		plexContainer.ImagePullPolicy = corev1.PullAlways
-		plexContainer.TerminationMessagePolicy = corev1.TerminationMessageReadFile
-		plexContainer.TerminationMessagePath = "/dev/termination-log"
-		statefulSet.Spec.Template.Spec.Containers[0] = plexContainer
-	}
-	if ready {
-		statefulSet.Status.Replicas = replicas
-		statefulSet.Status.ReadyReplicas = replicas
-	}
-	return statefulSet
 }
 
 func TestStatefulSetSuite(t *testing.T) {

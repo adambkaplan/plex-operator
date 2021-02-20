@@ -40,6 +40,79 @@ spec:
                 description: ClaimToken is the claim token needed to register the
                   Plex Media Server
                 type: string
+              storage:
+                description: "Storage configures the persistent volume claim attributes
+                  for Plex Media Server's backing volumes: \n 1. Config - Plex's configuration
+                  database 2. Transcode - Plex's space for transcoded media files
+                  3. Data - Plex's volume for user-provided media"
+                properties:
+                  config:
+                    description: Config specifics the volume claim attributes for
+                      Plex Media Server's database
+                    properties:
+                      accessMode:
+                        description: AccessMode sets the access mode for the PersistentVolumeClaim
+                          used for this Plex volume.
+                        type: string
+                      capacity:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: Capacity specifies the requested capacity for
+                          the PersistentVolumeClaim. The provided volume for this
+                          claim may exceed this value.
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      storageClassName:
+                        description: StorageClassName specifies the storage class
+                          for the PersistentVolumeClaim.
+                        type: string
+                    type: object
+                  data:
+                    description: Data specifies the volume claim attributes for Plex
+                      Media Server's media data
+                    properties:
+                      accessMode:
+                        description: AccessMode sets the access mode for the PersistentVolumeClaim
+                          used for this Plex volume.
+                        type: string
+                      capacity:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: Capacity specifies the requested capacity for
+                          the PersistentVolumeClaim. The provided volume for this
+                          claim may exceed this value.
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      storageClassName:
+                        description: StorageClassName specifies the storage class
+                          for the PersistentVolumeClaim.
+                        type: string
+                    type: object
+                  transcode:
+                    description: Transcode specifies the volume claim attributes for
+                      Plex Media Server's transcoded media files
+                    properties:
+                      accessMode:
+                        description: AccessMode sets the access mode for the PersistentVolumeClaim
+                          used for this Plex volume.
+                        type: string
+                      capacity:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: Capacity specifies the requested capacity for
+                          the PersistentVolumeClaim. The provided volume for this
+                          claim may exceed this value.
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                      storageClassName:
+                        description: StorageClassName specifies the storage class
+                          for the PersistentVolumeClaim.
+                        type: string
+                    type: object
+                type: object
               version:
                 description: Version is the version of Plex Media server deployed
                   on the cluster

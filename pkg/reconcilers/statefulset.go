@@ -108,32 +108,33 @@ func (r *StatefulSetReconciler) renderStatefulSetSpec(plex *plexv1alpha1.PlexMed
 			"plex.adambkaplan.com/instance": plex.Name,
 		},
 	}
+	existingStatefulSet.Template.Spec.Containers = r.renderContainers(plex, existingStatefulSet.Template.Spec.Containers)
+	existingStatefulSet.Template.Spec.Volumes = r.renderPlexPodVolumes(plex, existingStatefulSet.Template.Spec.Volumes)
+	existingStatefulSet.VolumeClaimTemplates = r.renderPlexVolumeClaims(plex, existingStatefulSet.VolumeClaimTemplates)
+	return existingStatefulSet
+}
+
+func (r *StatefulSetReconciler) renderContainers(plex *plexv1alpha1.PlexMediaServer, existing []corev1.Container) []corev1.Container {
 	containers := []corev1.Container{}
+	plexContainer := corev1.Container{
+		Name: "plex",
+	}
+	for _, c := range existing {
+		if c.Name == "plex" {
+			plexContainer = c
+			continue
+		}
+		containers = append(containers, c)
+	}
 	version := plex.Spec.Version
 	if version == "" {
 		version = "latest"
 	}
-	plexContainer := r.findPlexContainer(existingStatefulSet.Template.Spec.Containers)
 	plexContainer.Image = fmt.Sprintf("docker.io/plexinc/pms-docker:%s", version)
 	plexContainer.Ports = r.renderPlexContainerPorts(plexContainer.Ports)
 	plexContainer.VolumeMounts = r.renderPlexContainerVolumeMounts(plexContainer.VolumeMounts)
 	containers = append(containers, plexContainer)
-	existingStatefulSet.Template.Spec.Containers = containers
-	existingStatefulSet.Template.Spec.Volumes = r.renderPlexVolumes(existingStatefulSet.Template.Spec.Volumes)
-	return existingStatefulSet
-}
-
-func (r *StatefulSetReconciler) findPlexContainer(existing []corev1.Container) corev1.Container {
-	plexContainer := corev1.Container{
-		Name: "plex",
-	}
-	for _, container := range existing {
-		if container.Name == "plex" {
-			plexContainer = container
-			break
-		}
-	}
-	return plexContainer
+	return containers
 }
 
 func (r *StatefulSetReconciler) renderPlexContainerPorts(existing []corev1.ContainerPort) []corev1.ContainerPort {
@@ -182,7 +183,7 @@ func (r *StatefulSetReconciler) renderPlexContainerVolumeMounts(existing []corev
 	return volumeMounts
 }
 
-func (r *StatefulSetReconciler) renderPlexVolumes(existing []corev1.Volume) []corev1.Volume {
+func (r *StatefulSetReconciler) renderPlexPodVolumes(plex *plexv1alpha1.PlexMediaServer, existing []corev1.Volume) []corev1.Volume {
 	volumes := []corev1.Volume{}
 	configVolume := corev1.Volume{Name: "config"}
 	transcodeVolume := corev1.Volume{Name: "transcode"}
@@ -203,8 +204,80 @@ func (r *StatefulSetReconciler) renderPlexVolumes(existing []corev1.Volume) []co
 		volumes = append(volumes, volume)
 	}
 	configVolume.EmptyDir = &corev1.EmptyDirVolumeSource{}
+	if plex.Spec.Storage.Config == nil {
+		volumes = append(volumes, configVolume)
+	}
+
 	transcodeVolume.EmptyDir = &corev1.EmptyDirVolumeSource{}
+	if plex.Spec.Storage.Transcode == nil {
+		volumes = append(volumes, transcodeVolume)
+	}
+
 	dataVolume.EmptyDir = &corev1.EmptyDirVolumeSource{}
-	volumes = append(volumes, configVolume, transcodeVolume, dataVolume)
+	if plex.Spec.Storage.Data == nil {
+		volumes = append(volumes, dataVolume)
+	}
 	return volumes
+}
+
+func (r *StatefulSetReconciler) renderPlexVolumeClaims(plex *plexv1alpha1.PlexMediaServer, existing []corev1.PersistentVolumeClaim) []corev1.PersistentVolumeClaim {
+	claims := []corev1.PersistentVolumeClaim{}
+	config := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "config",
+		},
+	}
+	transcode := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "transcode",
+		},
+	}
+	data := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "data",
+		},
+	}
+	for _, v := range existing {
+		if v.Name == "config" {
+			config = &v
+			continue
+		}
+		if v.Name == "transcode" {
+			transcode = &v
+			continue
+		}
+		if v.Name == "data" {
+			data = &v
+			continue
+		}
+		claims = append(claims, v)
+	}
+	claims = r.appendPersistentVolumeClaim(claims, config, plex.Spec.Storage.Config)
+	claims = r.appendPersistentVolumeClaim(claims, transcode, plex.Spec.Storage.Transcode)
+	claims = r.appendPersistentVolumeClaim(claims, data, plex.Spec.Storage.Data)
+
+	return claims
+}
+
+func (r *StatefulSetReconciler) appendPersistentVolumeClaim(claims []corev1.PersistentVolumeClaim, existing *corev1.PersistentVolumeClaim, spec *plexv1alpha1.PlexStorageOptions) []corev1.PersistentVolumeClaim {
+	if spec == nil {
+		return claims
+	}
+	pvc := existing.DeepCopy()
+	if len(spec.AccessMode) > 0 {
+		pvc.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{
+			spec.AccessMode,
+		}
+	}
+	if !spec.Capacity.IsZero() {
+		if pvc.Spec.Resources.Requests == nil {
+			pvc.Spec.Resources.Requests = make(corev1.ResourceList)
+		}
+		pvc.Spec.Resources.Requests[corev1.ResourceStorage] = spec.Capacity
+	}
+	if spec.StorageClassName != "" {
+		pvc.Spec.StorageClassName = &spec.StorageClassName
+	}
+	claims = append(claims, *pvc)
+	return claims
 }

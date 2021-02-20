@@ -7,6 +7,8 @@ SPDX-License-Identifier: Apache-2.0
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -25,6 +27,50 @@ type PlexMediaServerSpec struct {
 	// ClaimToken is the claim token needed to register the Plex Media Server
 	// +optional
 	ClaimToken string `json:"claimToken,omitempty"`
+
+	// Storage configures the persistent volume claim attributes for Plex Media Server's backing
+	// volumes:
+	//
+	// 1. Config - Plex's configuration database
+	// 2. Transcode - Plex's space for transcoded media files
+	// 3. Data - Plex's volume for user-provided media
+	// +optional
+	Storage PlexMediaServerStorageSpec `json:"storage,omitempty"`
+}
+
+// PlexMediaServerStorageSpec defines persistent volume claim attributes for the
+// volumes used by the Plex Media Server
+type PlexMediaServerStorageSpec struct {
+
+	// Config specifics the volume claim attributes for Plex Media Server's database
+	// +optional
+	Config *PlexStorageOptions `json:"config,omitempty"`
+
+	// Transcode specifies the volume claim attributes for Plex Media Server's transcoded
+	// media files
+	// +optional
+	Transcode *PlexStorageOptions `json:"transcode,omitempty"`
+
+	// Data specifies the volume claim attributes for Plex Media Server's media data
+	// +optional
+	Data *PlexStorageOptions `json:"data,omitempty"`
+}
+
+// PlexStorageOptions configures a PersistentVolumeClaim used by the Plex Media Server
+type PlexStorageOptions struct {
+
+	// AccessMode sets the access mode for the PersistentVolumeClaim used for this Plex volume.
+	// +optional
+	AccessMode corev1.PersistentVolumeAccessMode `json:"accessMode,omitempty"`
+
+	// Capacity specifies the requested capacity for the PersistentVolumeClaim.
+	// The provided volume for this claim may exceed this value.
+	// +optional
+	Capacity resource.Quantity `json:"capacity,omitempty"`
+
+	// StorageClassName specifies the storage class for the PersistentVolumeClaim.
+	// +optional
+	StorageClassName string `json:"storageClassName,omitempty"`
 }
 
 // PlexMediaServerStatus defines the observed state of PlexMediaServer

@@ -64,7 +64,10 @@ func (test *statusReconcileSuite) SetupTest() {
 					Generation: int64(1),
 				},
 			},
-			existingStatefulSet: mockStatefulSet("test", "not-ready", int32(1), "latest", true, false),
+			existingStatefulSet: doubleStatefulSet("test", "not-ready", statefulSetDoubleOptions{
+				Replicas:        1,
+				IncludeDefaults: true,
+			}),
 			expectedStatus: v1alpha1.PlexMediaServerStatus{
 				ObservedGeneration: int64(1),
 				Conditions: []metav1.Condition{
@@ -86,7 +89,11 @@ func (test *statusReconcileSuite) SetupTest() {
 					Generation: int64(1),
 				},
 			},
-			existingStatefulSet: mockStatefulSet("test", "ready", int32(1), "latest", true, true),
+			existingStatefulSet: doubleStatefulSet("test", "ready", statefulSetDoubleOptions{
+				Replicas:        1,
+				IncludeDefaults: true,
+				Ready:           true,
+			}),
 			expectedStatus: v1alpha1.PlexMediaServerStatus{
 				ObservedGeneration: int64(1),
 				Conditions: []metav1.Condition{
