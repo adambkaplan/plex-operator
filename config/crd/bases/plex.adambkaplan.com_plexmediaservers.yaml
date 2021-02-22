@@ -40,6 +40,20 @@ spec:
                 description: ClaimToken is the claim token needed to register the
                   Plex Media Server
                 type: string
+              networking:
+                description: NetworkSpec specifies network options for the Plex Media
+                  Server
+                properties:
+                  externalServiceType:
+                    description: ExternalServiceType configures an external-facing
+                      Service for Plex Media Server, in addition to the headless service
+                      used for Plex's underlying StatefulSet deployment. Can be one
+                      of NodePort or LoadBalancer
+                    enum:
+                    - NodePort
+                    - LoadBalancer
+                    type: string
+                type: object
               storage:
                 description: "Storage configures the persistent volume claim attributes
                   for Plex Media Server's backing volumes: \n 1. Config - Plex's configuration

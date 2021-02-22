@@ -63,6 +63,7 @@ func (r *PlexMediaServerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	reconcilers := []reconcilers.Reconciler{
 		reconcilers.NewServiceReconciler(r.Client, log, r.Scheme),
+		reconcilers.NewExternalServiceReconciler(r.Client, log, r.Scheme),
 		reconcilers.NewStatefulSetReconciler(r.Client, log, r.Scheme),
 		reconcilers.NewStatusReconciler(r.Client, log, r.Scheme),
 	}

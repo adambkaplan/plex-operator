@@ -41,8 +41,10 @@ func (test *serviceReconcileSuite) SetupTest() {
 					Name:      "test",
 				},
 			},
-			expectedService: mockService("test", "test"),
-			expectRequeue:   true,
+			expectedService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+			}),
+			expectRequeue: true,
 		},
 		{
 			name: "no change",
@@ -52,8 +54,12 @@ func (test *serviceReconcileSuite) SetupTest() {
 					Name:      "no-change",
 				},
 			},
-			existingService: mockService("no-change", "no-change"),
-			expectedService: mockService("no-change", "no-change"),
+			existingService: serviceDouble("no-change", "no-change", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+			}),
+			expectedService: serviceDouble("no-change", "no-change", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+			}),
 		},
 	}
 }
@@ -93,22 +99,30 @@ func (test *serviceReconcileSuite) TestServiceReconcile() {
 				"expected service\n\n%s\n\ndoes not match\n\n%s",
 				tc.expectedService.Spec,
 				updatedService.Spec)
-
 		})
 	}
 }
 
-func mockService(namespace, name string) *corev1.Service {
+type serviceDoubleOptions struct {
+	ServiceName string
+	ClusterIP   string
+	ServiceType corev1.ServiceType
+}
+
+func serviceDouble(namespace, plexName string, options serviceDoubleOptions) *corev1.Service {
+	if options.ServiceName == "" {
+		options.ServiceName = plexName
+	}
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
-			Name:      name,
+			Name:      options.ServiceName,
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{
-				"plex.adambkaplan.com/instance": name,
+				"plex.adambkaplan.com/instance": plexName,
 			},
-			ClusterIP: corev1.ClusterIPNone,
+			ClusterIP: options.ClusterIP,
 			Ports: []corev1.ServicePort{
 				{
 					Name:     "plex",
@@ -116,6 +130,7 @@ func mockService(namespace, name string) *corev1.Service {
 					Protocol: corev1.ProtocolTCP,
 				},
 			},
+			Type: options.ServiceType,
 		},
 	}
 

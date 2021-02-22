@@ -36,6 +36,8 @@ type PlexMediaServerSpec struct {
 	// 3. Data - Plex's volume for user-provided media
 	// +optional
 	Storage PlexMediaServerStorageSpec `json:"storage,omitempty"`
+
+	Networking NetworkSpec `json:"networking,omitempty"`
 }
 
 // PlexMediaServerStorageSpec defines persistent volume claim attributes for the
@@ -71,6 +73,17 @@ type PlexStorageOptions struct {
 	// StorageClassName specifies the storage class for the PersistentVolumeClaim.
 	// +optional
 	StorageClassName string `json:"storageClassName,omitempty"`
+}
+
+// NetworkSpec specifies network options for the Plex Media Server
+type NetworkSpec struct {
+
+	// ExternalServiceType configures an external-facing Service for Plex Media Server, in addition
+	// to the headless service used for Plex's underlying StatefulSet deployment.
+	// Can be one of NodePort or LoadBalancer
+	// +optional
+	// +kubebuilder:validation:Enum=NodePort;LoadBalancer
+	ExternalServiceType corev1.ServiceType `json:"externalServiceType,omitempty"`
 }
 
 // PlexMediaServerStatus defines the observed state of PlexMediaServer
