@@ -47,6 +47,11 @@ var _ = Describe("Storage options", func() {
 							AccessMode:       v1.ReadWriteOnce,
 							StorageClassName: "block",
 							Capacity:         resource.MustParse("10Gi"),
+							Selector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"media": "plex",
+								},
+							},
 						},
 					},
 				},
@@ -73,6 +78,11 @@ var _ = Describe("Storage options", func() {
 				v1.ResourceStorage: resource.MustParse("10Gi"),
 			}))
 			Expect(*configTemplate.Spec.StorageClassName).To(BeEquivalentTo("block"))
+			Expect(configTemplate.Spec.Selector).To(BeEquivalentTo(&metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"media": "plex",
+				},
+			}))
 			podVolumes := statefulSet.Spec.Template.Spec.Volumes
 			foundTranscode := false
 			foundData := false
@@ -105,6 +115,11 @@ var _ = Describe("Storage options", func() {
 							AccessMode:       v1.ReadWriteOnce,
 							StorageClassName: "block",
 							Capacity:         resource.MustParse("10Gi"),
+							Selector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"media": "plex",
+								},
+							},
 						},
 					},
 				},
@@ -131,6 +146,11 @@ var _ = Describe("Storage options", func() {
 				v1.ResourceStorage: resource.MustParse("10Gi"),
 			}))
 			Expect(*transcodeTemplate.Spec.StorageClassName).To(BeEquivalentTo("block"))
+			Expect(transcodeTemplate.Spec.Selector).To(BeEquivalentTo(&metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"media": "plex",
+				},
+			}))
 			podVolumes := statefulSet.Spec.Template.Spec.Volumes
 			foundConfig := false
 			foundData := false
@@ -163,6 +183,11 @@ var _ = Describe("Storage options", func() {
 							AccessMode:       v1.ReadWriteMany,
 							StorageClassName: "nfs",
 							Capacity:         resource.MustParse("100Gi"),
+							Selector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"media": "plex",
+								},
+							},
 						},
 					},
 				},
@@ -189,6 +214,11 @@ var _ = Describe("Storage options", func() {
 				v1.ResourceStorage: resource.MustParse("100Gi"),
 			}))
 			Expect(*dataTemplate.Spec.StorageClassName).To(Equal("nfs"))
+			Expect(dataTemplate.Spec.Selector).To(BeEquivalentTo(&metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"media": "plex",
+				},
+			}))
 			podVolumes := statefulSet.Spec.Template.Spec.Volumes
 			foundTranscode := false
 			foundConfig := false

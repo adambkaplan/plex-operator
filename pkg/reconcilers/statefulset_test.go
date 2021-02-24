@@ -173,6 +173,7 @@ type statefulSetReconcileSuite struct {
 }
 
 func (test *statefulSetReconcileSuite) SetupTest() {
+	storageClass := "test"
 	test.cases = []statefulSetTestCase{
 		{
 			name: "create with defaults",
@@ -214,8 +215,14 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 				Spec: v1alpha1.PlexMediaServerSpec{
 					Storage: v1alpha1.PlexMediaServerStorageSpec{
 						Config: &v1alpha1.PlexStorageOptions{
-							AccessMode: corev1.ReadWriteOnce,
-							Capacity:   resource.MustParse("10Gi"),
+							AccessMode:       corev1.ReadWriteOnce,
+							Capacity:         resource.MustParse("10Gi"),
+							StorageClassName: "test",
+							Selector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"media": "plex",
+								},
+							},
 						},
 					},
 				},
@@ -227,6 +234,12 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 					AccessModes: []corev1.PersistentVolumeAccessMode{
 						corev1.ReadWriteOnce,
 					},
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"media": "plex",
+						},
+					},
+					StorageClassName: &storageClass,
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: resource.MustParse("10Gi"),

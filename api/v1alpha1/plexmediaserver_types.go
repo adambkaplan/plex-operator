@@ -73,6 +73,10 @@ type PlexStorageOptions struct {
 	// StorageClassName specifies the storage class for the PersistentVolumeClaim.
 	// +optional
 	StorageClassName string `json:"storageClassName,omitempty"`
+
+	// Selector is a label selector that can be applied to the PersistentVolumeClaim
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
 // NetworkSpec specifies network options for the Plex Media Server

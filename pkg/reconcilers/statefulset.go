@@ -278,6 +278,7 @@ func (r *StatefulSetReconciler) appendPersistentVolumeClaim(claims []corev1.Pers
 	if spec.StorageClassName != "" {
 		pvc.Spec.StorageClassName = &spec.StorageClassName
 	}
+	pvc.Spec.Selector = spec.Selector
 	claims = append(claims, *pvc)
 	return claims
 }
