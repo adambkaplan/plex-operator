@@ -72,7 +72,7 @@ func (test *externalServiceReconcileSuite) SetupTest() {
 					Name:      "create-lb",
 				},
 				Spec: v1alpha1.PlexMediaServerSpec{
-					Networking: v1alpha1.NetworkSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
 						ExternalServiceType: corev1.ServiceTypeLoadBalancer,
 					},
 				},
@@ -91,7 +91,7 @@ func (test *externalServiceReconcileSuite) SetupTest() {
 					Name:      "create-np",
 				},
 				Spec: v1alpha1.PlexMediaServerSpec{
-					Networking: v1alpha1.NetworkSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
 						ExternalServiceType: corev1.ServiceTypeNodePort,
 					},
 				},
@@ -110,7 +110,7 @@ func (test *externalServiceReconcileSuite) SetupTest() {
 					Name:      "update-np",
 				},
 				Spec: v1alpha1.PlexMediaServerSpec{
-					Networking: v1alpha1.NetworkSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
 						ExternalServiceType: corev1.ServiceTypeNodePort,
 					},
 				},
@@ -133,7 +133,7 @@ func (test *externalServiceReconcileSuite) SetupTest() {
 					Name:      "update-lb",
 				},
 				Spec: v1alpha1.PlexMediaServerSpec{
-					Networking: v1alpha1.NetworkSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
 						ExternalServiceType: corev1.ServiceTypeLoadBalancer,
 					},
 				},
@@ -156,7 +156,7 @@ func (test *externalServiceReconcileSuite) SetupTest() {
 					Name:      "update-lb",
 				},
 				Spec: v1alpha1.PlexMediaServerSpec{
-					Networking: v1alpha1.NetworkSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
 						ExternalServiceType: corev1.ServiceTypeLoadBalancer,
 					},
 				},
@@ -178,7 +178,7 @@ func (test *externalServiceReconcileSuite) SetupTest() {
 					Name:      "update-np",
 				},
 				Spec: v1alpha1.PlexMediaServerSpec{
-					Networking: v1alpha1.NetworkSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
 						ExternalServiceType: corev1.ServiceTypeNodePort,
 					},
 				},

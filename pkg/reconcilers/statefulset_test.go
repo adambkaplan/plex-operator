@@ -213,11 +213,11 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 					Name:      "test-volume",
 				},
 				Spec: v1alpha1.PlexMediaServerSpec{
-					Storage: v1alpha1.PlexMediaServerStorageSpec{
+					Storage: v1alpha1.PlexStorageSpec{
 						Config: &v1alpha1.PlexStorageOptions{
 							AccessMode:       corev1.ReadWriteOnce,
 							Capacity:         resource.MustParse("10Gi"),
-							StorageClassName: "test",
+							StorageClassName: &storageClass,
 							Selector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
 									"media": "plex",
@@ -256,7 +256,7 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 					Name:      "test-volume",
 				},
 				Spec: v1alpha1.PlexMediaServerSpec{
-					Storage: v1alpha1.PlexMediaServerStorageSpec{
+					Storage: v1alpha1.PlexStorageSpec{
 						Config: &v1alpha1.PlexStorageOptions{
 							AccessMode: corev1.ReadWriteOnce,
 							Capacity:   resource.MustParse("10Gi"),
@@ -352,6 +352,30 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 			expectRequeue: true,
 		},
 		{
+			// Switching the storage to use a persistent volume requires the StatefulSet to be torn
+			// down and re-created.
+			name: "update storage to use a persistent volume",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "update-storage",
+					Name:      "data-pvc",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Storage: v1alpha1.PlexStorageSpec{
+						Data: &v1alpha1.PlexStorageOptions{
+							AccessMode: corev1.ReadWriteMany,
+						},
+					},
+				},
+			},
+			existingStatefulSet: doubleStatefulSet("update-storage", "data-pvc", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "latest",
+				IncludeDefaults: true,
+			}),
+			expectRequeue: true,
+		},
+		{
 			name: "no change",
 			plex: &v1alpha1.PlexMediaServer{
 				ObjectMeta: metav1.ObjectMeta{
@@ -407,7 +431,12 @@ func (test *statefulSetReconcileSuite) TestStatefulSetReconcile() {
 			}
 			updatedStatefulSet := &appsv1.StatefulSet{}
 			err = client.Get(ctx, types.NamespacedName{Namespace: tc.plex.Namespace, Name: tc.plex.Name}, updatedStatefulSet)
+			if tc.expectedStatefulSet == nil {
+				test.True(errors.IsNotFound(err), "expected statefulset to not exist")
+				return
+			}
 			test.Require().NoError(err, "failed to get StatefulSet")
+
 			test.True(equality.Semantic.DeepEqual(tc.expectedStatefulSet.Spec, updatedStatefulSet.Spec),
 				"expected statefulSet does not match - diff: %s",
 				cmp.Diff(tc.expectedStatefulSet.Spec, updatedStatefulSet.Spec))

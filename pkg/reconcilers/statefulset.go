@@ -42,7 +42,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, plex *plexv1alpha
 	namespacedName := types.NamespacedName{Namespace: plex.Namespace, Name: plex.Name}
 	log := r.Log.WithValues("statefulset", namespacedName)
 	err := r.Client.Get(ctx, namespacedName, origStatefulSet)
-	if err != nil && errors.IsNotFound(err) {
+	if errors.IsNotFound(err) {
 		log.Info("creating")
 		origStatefulSet = r.createStatefulSet(plex)
 		err = r.Client.Create(ctx, origStatefulSet, &client.CreateOptions{})
@@ -60,6 +60,23 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, plex *plexv1alpha
 
 	desiredStatefulSet := origStatefulSet.DeepCopy()
 	desiredStatefulSet.Spec = r.renderStatefulSetSpec(plex, desiredStatefulSet.Spec)
+
+	if !equality.Semantic.DeepEqual(origStatefulSet.Spec.VolumeClaimTemplates, desiredStatefulSet.Spec.VolumeClaimTemplates) {
+		log.Info("deleting because volume claim templates changed")
+		background := metav1.DeletePropagationBackground
+		err = r.Delete(ctx, desiredStatefulSet, &client.DeleteOptions{
+			PropagationPolicy: &background,
+		})
+		if errors.IsConflict(err) {
+			log.Info("conflict on delete, requeueing")
+			return true, nil
+		}
+		if err != nil {
+			log.Error(err, "failed to delete object")
+			return true, err
+		}
+		return true, nil
+	}
 
 	if !equality.Semantic.DeepEqual(origStatefulSet.Spec, desiredStatefulSet.Spec) {
 		log.Info("updating")
@@ -275,10 +292,12 @@ func (r *StatefulSetReconciler) appendPersistentVolumeClaim(claims []corev1.Pers
 		}
 		pvc.Spec.Resources.Requests[corev1.ResourceStorage] = spec.Capacity
 	}
-	if spec.StorageClassName != "" {
-		pvc.Spec.StorageClassName = &spec.StorageClassName
+	if spec.StorageClassName != nil {
+		pvc.Spec.StorageClassName = spec.StorageClassName
 	}
-	pvc.Spec.Selector = spec.Selector
+	if spec.Selector != nil {
+		pvc.Spec.Selector = spec.Selector
+	}
 	claims = append(claims, *pvc)
 	return claims
 }

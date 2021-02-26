@@ -63,7 +63,10 @@ func (r *ExternalServiceReconciler) Reconcile(ctx context.Context, plex *v1alpha
 	// If the external service type is set to "", this means we no longer need an external service
 	if plex.Spec.Networking.ExternalServiceType == "" {
 		log.Info("deleting")
-		err = r.Client.Delete(ctx, origService, &client.DeleteOptions{})
+		background := metav1.DeletePropagationBackground
+		err = r.Client.Delete(ctx, origService, &client.DeleteOptions{
+			PropagationPolicy: &background,
+		})
 		if err != nil {
 			return true, err
 		}

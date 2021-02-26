@@ -35,14 +35,16 @@ type PlexMediaServerSpec struct {
 	// 2. Transcode - Plex's space for transcoded media files
 	// 3. Data - Plex's volume for user-provided media
 	// +optional
-	Storage PlexMediaServerStorageSpec `json:"storage,omitempty"`
+	Storage PlexStorageSpec `json:"storage,omitempty"`
 
-	Networking NetworkSpec `json:"networking,omitempty"`
+	// Networking configures network options for the Plex Media Server, such as an external-facing service.
+	// +optional
+	Networking PlexNetworkSpec `json:"networking,omitempty"`
 }
 
-// PlexMediaServerStorageSpec defines persistent volume claim attributes for the
+// PlexStorageSpec defines persistent volume claim attributes for the
 // volumes used by the Plex Media Server
-type PlexMediaServerStorageSpec struct {
+type PlexStorageSpec struct {
 
 	// Config specifics the volume claim attributes for Plex Media Server's database
 	// +optional
@@ -72,15 +74,15 @@ type PlexStorageOptions struct {
 
 	// StorageClassName specifies the storage class for the PersistentVolumeClaim.
 	// +optional
-	StorageClassName string `json:"storageClassName,omitempty"`
+	StorageClassName *string `json:"storageClassName,omitempty"`
 
 	// Selector is a label selector that can be applied to the PersistentVolumeClaim
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
-// NetworkSpec specifies network options for the Plex Media Server
-type NetworkSpec struct {
+// PlexNetworkSpec specifies network options for the Plex Media Server
+type PlexNetworkSpec struct {
 
 	// ExternalServiceType configures an external-facing Service for Plex Media Server, in addition
 	// to the headless service used for Plex's underlying StatefulSet deployment.

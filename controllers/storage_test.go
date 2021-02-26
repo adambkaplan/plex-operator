@@ -36,16 +36,17 @@ var _ = Describe("Storage options", func() {
 	When("the Config PVC attributes are set", func() {
 
 		BeforeEach(func() {
+			block := "block"
 			plex = &v1alpha1.PlexMediaServer{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: RandomName("storage-config"),
 					Name:      "test-config",
 				},
 				Spec: v1alpha1.PlexMediaServerSpec{
-					Storage: v1alpha1.PlexMediaServerStorageSpec{
+					Storage: v1alpha1.PlexStorageSpec{
 						Config: &v1alpha1.PlexStorageOptions{
 							AccessMode:       v1.ReadWriteOnce,
-							StorageClassName: "block",
+							StorageClassName: &block,
 							Capacity:         resource.MustParse("10Gi"),
 							Selector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -104,16 +105,17 @@ var _ = Describe("Storage options", func() {
 	When("the Transcode PVC attributes are set", func() {
 
 		BeforeEach(func() {
+			block := "block"
 			plex = &v1alpha1.PlexMediaServer{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: RandomName("storage-config"),
 					Name:      "test-transcode",
 				},
 				Spec: v1alpha1.PlexMediaServerSpec{
-					Storage: v1alpha1.PlexMediaServerStorageSpec{
+					Storage: v1alpha1.PlexStorageSpec{
 						Transcode: &v1alpha1.PlexStorageOptions{
 							AccessMode:       v1.ReadWriteOnce,
-							StorageClassName: "block",
+							StorageClassName: &block,
 							Capacity:         resource.MustParse("10Gi"),
 							Selector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -172,16 +174,17 @@ var _ = Describe("Storage options", func() {
 	When("the Data PVC attributes are set", func() {
 
 		BeforeEach(func() {
+			nfs := "nfs"
 			plex = &v1alpha1.PlexMediaServer{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: RandomName("storage-data"),
 					Name:      "test-data",
 				},
 				Spec: v1alpha1.PlexMediaServerSpec{
-					Storage: v1alpha1.PlexMediaServerStorageSpec{
+					Storage: v1alpha1.PlexStorageSpec{
 						Data: &v1alpha1.PlexStorageOptions{
 							AccessMode:       v1.ReadWriteMany,
-							StorageClassName: "nfs",
+							StorageClassName: &nfs,
 							Capacity:         resource.MustParse("100Gi"),
 							Selector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{

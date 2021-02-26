@@ -45,7 +45,7 @@ var _ = Describe("External Service", func() {
 					Name:      "plex",
 				},
 				Spec: plexv1alpha1.PlexMediaServerSpec{
-					Networking: plexv1alpha1.NetworkSpec{
+					Networking: plexv1alpha1.PlexNetworkSpec{
 						ExternalServiceType: corev1.ServiceTypeLoadBalancer,
 					},
 				},
@@ -58,15 +58,24 @@ var _ = Describe("External Service", func() {
 
 		It("updates the service to NodePort if the external service type is later changed to NodePort", func() {
 			testExternalService(ctx, plex, retryTimeout, retryInterval)
-			currentPlex := &plexv1alpha1.PlexMediaServer{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: plex.Name}, currentPlex)
-			Expect(err).NotTo(HaveOccurred())
-			currentPlex.Spec.Networking.ExternalServiceType = corev1.ServiceTypeNodePort
-			err = k8sClient.Update(ctx, currentPlex, &client.UpdateOptions{})
+			var err error
+			Eventually(func() bool {
+				currentPlex := &plexv1alpha1.PlexMediaServer{}
+				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: plex.Name}, currentPlex)
+				if err != nil {
+					return true
+				}
+				currentPlex.Spec.Networking.ExternalServiceType = corev1.ServiceTypeNodePort
+				err = k8sClient.Update(ctx, currentPlex, &client.UpdateOptions{})
+				if errors.IsConflict(err) {
+					return false
+				}
+				return true
+			}, retryTimeout, retryInterval).Should(BeTrue())
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(func() corev1.ServiceType {
 				svc := &corev1.Service{}
-				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: currentPlex.Namespace, Name: fmt.Sprintf("%s-ext", currentPlex.Name)}, svc)
+				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: fmt.Sprintf("%s-ext", plex.Name)}, svc)
 				if err != nil {
 					return ""
 				}
@@ -76,17 +85,26 @@ var _ = Describe("External Service", func() {
 
 		It("deletes the service if the external service type is later removed", func() {
 			testExternalService(ctx, plex, retryTimeout, retryInterval)
-			currentPlex := &plexv1alpha1.PlexMediaServer{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: plex.Name}, currentPlex)
-			Expect(err).NotTo(HaveOccurred())
-			currentPlex.Spec.Networking.ExternalServiceType = ""
-			err = k8sClient.Update(ctx, currentPlex, &client.UpdateOptions{})
+			var err error
+			Eventually(func() bool {
+				currentPlex := &plexv1alpha1.PlexMediaServer{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: plex.Name}, currentPlex)
+				if err != nil {
+					return true
+				}
+				currentPlex.Spec.Networking.ExternalServiceType = ""
+				err = k8sClient.Update(ctx, currentPlex, &client.UpdateOptions{})
+				if errors.IsConflict(err) {
+					return false
+				}
+				return true
+			}, retryTimeout, retryInterval).Should(BeTrue())
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(func() bool {
 				svc := &corev1.Service{}
 				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: fmt.Sprintf("%s-ext", plex.Name)}, svc)
 				return errors.IsNotFound(err)
-			}, retryTimeout, retryInterval)
+			}, retryTimeout, retryInterval).Should(BeTrue())
 		})
 	})
 
@@ -99,7 +117,7 @@ var _ = Describe("External Service", func() {
 					Name:      "plex",
 				},
 				Spec: plexv1alpha1.PlexMediaServerSpec{
-					Networking: plexv1alpha1.NetworkSpec{
+					Networking: plexv1alpha1.PlexNetworkSpec{
 						ExternalServiceType: corev1.ServiceTypeNodePort,
 					},
 				},
@@ -112,15 +130,25 @@ var _ = Describe("External Service", func() {
 
 		It("updates the service to LoadBalancer if the external service type is later changed to LoadBalancer", func() {
 			testExternalService(ctx, plex, retryTimeout, retryInterval)
-			currentPlex := &plexv1alpha1.PlexMediaServer{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: plex.Name}, currentPlex)
-			Expect(err).NotTo(HaveOccurred())
-			currentPlex.Spec.Networking.ExternalServiceType = corev1.ServiceTypeLoadBalancer
-			err = k8sClient.Update(ctx, currentPlex, &client.UpdateOptions{})
+			var err error
+			Eventually(func() bool {
+				currentPlex := &plexv1alpha1.PlexMediaServer{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: plex.Name}, currentPlex)
+				if err != nil {
+					return true
+				}
+				currentPlex.Spec.Networking.ExternalServiceType = corev1.ServiceTypeLoadBalancer
+				err = k8sClient.Update(ctx, currentPlex, &client.UpdateOptions{})
+				if errors.IsConflict(err) {
+					return false
+				}
+				return true
+			}, retryTimeout, retryInterval).Should(BeTrue())
+
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(func() corev1.ServiceType {
 				svc := &corev1.Service{}
-				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: currentPlex.Namespace, Name: fmt.Sprintf("%s-ext", currentPlex.Name)}, svc)
+				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: fmt.Sprintf("%s-ext", plex.Name)}, svc)
 				if err != nil {
 					return ""
 				}
@@ -130,17 +158,26 @@ var _ = Describe("External Service", func() {
 
 		It("deletes the service if the external service type is later removed", func() {
 			testExternalService(ctx, plex, retryTimeout, retryInterval)
-			currentPlex := &plexv1alpha1.PlexMediaServer{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: plex.Name}, currentPlex)
-			Expect(err).NotTo(HaveOccurred())
-			currentPlex.Spec.Networking.ExternalServiceType = ""
-			err = k8sClient.Update(ctx, currentPlex, &client.UpdateOptions{})
+			var err error
+			Eventually(func() bool {
+				currentPlex := &plexv1alpha1.PlexMediaServer{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: plex.Name}, currentPlex)
+				if err != nil {
+					return true
+				}
+				currentPlex.Spec.Networking.ExternalServiceType = ""
+				err = k8sClient.Update(ctx, currentPlex, &client.UpdateOptions{})
+				if errors.IsConflict(err) {
+					return false
+				}
+				return true
+			}, retryTimeout, retryInterval).Should(BeTrue())
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(func() bool {
 				svc := &corev1.Service{}
 				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: fmt.Sprintf("%s-ext", plex.Name)}, svc)
 				return errors.IsNotFound(err)
-			}, retryTimeout, retryInterval)
+			}, retryTimeout, retryInterval).Should(BeTrue())
 		})
 	})
 })

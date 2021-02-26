@@ -41,8 +41,8 @@ spec:
                   Plex Media Server
                 type: string
               networking:
-                description: NetworkSpec specifies network options for the Plex Media
-                  Server
+                description: Networking configures network options for the Plex Media
+                  Server, such as an external-facing service.
                 properties:
                   externalServiceType:
                     description: ExternalServiceType configures an external-facing
