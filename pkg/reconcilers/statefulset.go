@@ -4,20 +4,20 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/equality"
-
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
+	"github.com/go-logr/logr"
+	"github.com/google/go-cmp/cmp"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	plexv1alpha1 "github.com/adambkaplan/plex-operator/api/v1alpha1"
-	"github.com/go-logr/logr"
 )
 
 // StatefulSetReconciler is a reconciler for the PlexMediaServer's StatefulSet
@@ -63,6 +63,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, plex *plexv1alpha
 
 	if !equality.Semantic.DeepEqual(origStatefulSet.Spec.VolumeClaimTemplates, desiredStatefulSet.Spec.VolumeClaimTemplates) {
 		log.Info("deleting because volume claim templates changed")
+		log.Info(fmt.Sprintf("diff: %s", cmp.Diff(origStatefulSet.Spec.VolumeClaimTemplates, desiredStatefulSet.Spec.VolumeClaimTemplates)))
 		background := metav1.DeletePropagationBackground
 		err = r.Delete(ctx, desiredStatefulSet, &client.DeleteOptions{
 			PropagationPolicy: &background,
@@ -239,46 +240,55 @@ func (r *StatefulSetReconciler) renderPlexPodVolumes(plex *plexv1alpha1.PlexMedi
 
 func (r *StatefulSetReconciler) renderPlexVolumeClaims(plex *plexv1alpha1.PlexMediaServer, existing []corev1.PersistentVolumeClaim) []corev1.PersistentVolumeClaim {
 	claims := []corev1.PersistentVolumeClaim{}
-	config := &corev1.PersistentVolumeClaim{
+	config := corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "config",
 		},
 	}
-	transcode := &corev1.PersistentVolumeClaim{
+	transcode := corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "transcode",
 		},
 	}
-	data := &corev1.PersistentVolumeClaim{
+	data := corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "data",
 		},
 	}
 	for _, v := range existing {
 		if v.Name == "config" {
-			config = &v
+			config = v
 			continue
 		}
 		if v.Name == "transcode" {
-			transcode = &v
+			transcode = v
 			continue
 		}
 		if v.Name == "data" {
-			data = &v
+			data = v
 			continue
 		}
 		claims = append(claims, v)
 	}
-	claims = r.appendPersistentVolumeClaim(claims, config, plex.Spec.Storage.Config)
-	claims = r.appendPersistentVolumeClaim(claims, transcode, plex.Spec.Storage.Transcode)
-	claims = r.appendPersistentVolumeClaim(claims, data, plex.Spec.Storage.Data)
 
+	if newConfig, add := r.renderPersistentVolumeClaim(config, plex.Spec.Storage.Config); add {
+		claims = append(claims, newConfig)
+	}
+	if newTranscode, add := r.renderPersistentVolumeClaim(transcode, plex.Spec.Storage.Transcode); add {
+		claims = append(claims, newTranscode)
+	}
+	if newData, add := r.renderPersistentVolumeClaim(data, plex.Spec.Storage.Data); add {
+		claims = append(claims, newData)
+	}
 	return claims
 }
 
-func (r *StatefulSetReconciler) appendPersistentVolumeClaim(claims []corev1.PersistentVolumeClaim, existing *corev1.PersistentVolumeClaim, spec *plexv1alpha1.PlexStorageOptions) []corev1.PersistentVolumeClaim {
+// renderPersistentVolumeClaim renders a PVC on top of the provided PVC, based on the configuration
+// provided in the PlexStorageOptions. It returns the updated PVC, and true if the PVC should be
+// appended to the StatefulSet volume claim template.
+func (r *StatefulSetReconciler) renderPersistentVolumeClaim(existing corev1.PersistentVolumeClaim, spec *plexv1alpha1.PlexStorageOptions) (corev1.PersistentVolumeClaim, bool) {
 	if spec == nil {
-		return claims
+		return existing, false
 	}
 	pvc := existing.DeepCopy()
 	if len(spec.AccessMode) > 0 {
@@ -298,6 +308,5 @@ func (r *StatefulSetReconciler) appendPersistentVolumeClaim(claims []corev1.Pers
 	if spec.Selector != nil {
 		pvc.Spec.Selector = spec.Selector
 	}
-	claims = append(claims, *pvc)
-	return claims
+	return *pvc, true
 }

@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-
 	"github.com/go-logr/logr"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/suite"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -382,14 +381,87 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 					Namespace: "no-change",
 					Name:      "no-change",
 				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Storage: v1alpha1.PlexStorageSpec{
+						Config: &v1alpha1.PlexStorageOptions{
+							AccessMode:       corev1.ReadWriteOnce,
+							Capacity:         resource.MustParse("10Gi"),
+							StorageClassName: &storageClass,
+						},
+						Data: &v1alpha1.PlexStorageOptions{
+							AccessMode:       corev1.ReadWriteMany,
+							Capacity:         resource.MustParse("100Gi"),
+							StorageClassName: &storageClass,
+							Selector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"media": "plex",
+								},
+							},
+						},
+					},
+				},
 			},
 			existingStatefulSet: doubleStatefulSet("no-change", "no-change", statefulSetDoubleOptions{
 				Replicas:        1,
 				IncludeDefaults: true,
+				ConfigVolume: &corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
+					StorageClassName: &storageClass,
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("10Gi"),
+						},
+					},
+				},
+				DataVolume: &corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteMany,
+					},
+					StorageClassName: &storageClass,
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"media": "plex",
+						},
+					},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("100Gi"),
+						},
+					},
+				},
 			}),
 			expectedStatefulSet: doubleStatefulSet("no-change", "no-change", statefulSetDoubleOptions{
 				Replicas:        1,
 				IncludeDefaults: true,
+				ConfigVolume: &corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
+					StorageClassName: &storageClass,
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("10Gi"),
+						},
+					},
+				},
+				DataVolume: &corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteMany,
+					},
+					StorageClassName: &storageClass,
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"media": "plex",
+						},
+					},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("100Gi"),
+						},
+					},
+				},
 			}),
 		},
 	}
@@ -397,6 +469,8 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 
 func (test *statefulSetReconcileSuite) TestStatefulSetReconcile() {
 	log := logr.Discard()
+	// Use log below for debugging unit tests
+	// log := zap.New(zap.UseDevMode(true))
 
 	for _, tc := range test.cases {
 		test.Run(tc.name, func() {
