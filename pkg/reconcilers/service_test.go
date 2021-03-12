@@ -123,6 +123,41 @@ func (test *serviceReconcileSuite) SetupTest() {
 			expectRequeue: true,
 		},
 		{
+			name: "create with dlna",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+					Name:      "test",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
+						EnableDLNA: true,
+					},
+				},
+			},
+			expectedService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+				Ports: []corev1.ServicePort{
+					{
+						Name:     "dlna-udp",
+						Port:     1900,
+						Protocol: corev1.ProtocolUDP,
+					},
+					{
+						Name:     "plex",
+						Port:     32400,
+						Protocol: corev1.ProtocolTCP,
+					},
+					{
+						Name:     "dlna-tcp",
+						Port:     32469,
+						Protocol: corev1.ProtocolTCP,
+					},
+				},
+			}),
+			expectRequeue: true,
+		},
+		{
 			name: "update add network discovery",
 			plex: &v1alpha1.PlexMediaServer{
 				ObjectMeta: metav1.ObjectMeta{
@@ -270,6 +305,78 @@ func (test *serviceReconcileSuite) SetupTest() {
 					{
 						Name:     "plex",
 						Port:     32400,
+						Protocol: corev1.ProtocolTCP,
+					},
+				},
+			}),
+			expectRequeue: true,
+		},
+		{
+			name: "update add dlna",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+					Name:      "test",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
+						EnableDLNA: true,
+					},
+				},
+			},
+			existingService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+			}),
+			expectedService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+				Ports: []corev1.ServicePort{
+					{
+						Name:     "dlna-udp",
+						Port:     1900,
+						Protocol: corev1.ProtocolUDP,
+					},
+					{
+						Name:     "plex",
+						Port:     32400,
+						Protocol: corev1.ProtocolTCP,
+					},
+					{
+						Name:     "dlna-tcp",
+						Port:     32469,
+						Protocol: corev1.ProtocolTCP,
+					},
+				},
+			}),
+			expectRequeue: true,
+		},
+		{
+			name: "update remove dlna",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+					Name:      "test",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{},
+			},
+			expectedService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+			}),
+			existingService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+				Ports: []corev1.ServicePort{
+					{
+						Name:     "dlna-udp",
+						Port:     1900,
+						Protocol: corev1.ProtocolUDP,
+					},
+					{
+						Name:     "plex",
+						Port:     32400,
+						Protocol: corev1.ProtocolTCP,
+					},
+					{
+						Name:     "dlna-tcp",
+						Port:     32469,
 						Protocol: corev1.ProtocolTCP,
 					},
 				},

@@ -384,6 +384,41 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 			}),
 		},
 		{
+			name: "create with DLNA",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "create-dlna",
+					Name:      "dlna",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
+						EnableDLNA: true,
+					},
+				},
+			},
+			expectRequeue: true,
+			expectedStatefulSet: doubleStatefulSet("create-dlna", "dlna", statefulSetDoubleOptions{
+				Replicas: 1,
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          "dlna-udp",
+						ContainerPort: 1900,
+						Protocol:      corev1.ProtocolUDP,
+					},
+					{
+						Name:          "plex",
+						ContainerPort: 32400,
+						Protocol:      corev1.ProtocolTCP,
+					},
+					{
+						Name:          "dlna-tcp",
+						ContainerPort: 32469,
+						Protocol:      corev1.ProtocolTCP,
+					},
+				},
+			}),
+		},
+		{
 			name: "update with version",
 			plex: &v1alpha1.PlexMediaServer{
 				ObjectMeta: metav1.ObjectMeta{
@@ -614,6 +649,85 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 					{
 						Name:          "plex",
 						ContainerPort: 32400,
+						Protocol:      corev1.ProtocolTCP,
+					},
+				},
+			}),
+		},
+		{
+			name:          "update add DLNA",
+			expectRequeue: true,
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "update-add-dlna",
+					Name:      "dlna",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
+						EnableDLNA: true,
+					},
+				},
+			},
+			existingStatefulSet: doubleStatefulSet("update-add-dlna", "dlna", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "latest",
+				IncludeDefaults: true,
+			}),
+			expectedStatefulSet: doubleStatefulSet("update-add-dlna", "dlna", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "latest",
+				IncludeDefaults: true,
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          "dlna-udp",
+						ContainerPort: 1900,
+						Protocol:      corev1.ProtocolUDP,
+					},
+					{
+						Name:          "plex",
+						ContainerPort: 32400,
+						Protocol:      corev1.ProtocolTCP,
+					},
+					{
+						Name:          "dlna-tcp",
+						ContainerPort: 32469,
+						Protocol:      corev1.ProtocolTCP,
+					},
+				},
+			}),
+		},
+		{
+			name:          "update remove DLNA",
+			expectRequeue: true,
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "update-rm-dlna",
+					Name:      "dlna",
+				},
+			},
+			expectedStatefulSet: doubleStatefulSet("update-rm-dlna", "dlna", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "latest",
+				IncludeDefaults: true,
+			}),
+			existingStatefulSet: doubleStatefulSet("update-rm-dlna", "dlna", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "latest",
+				IncludeDefaults: true,
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          "dlna-udp",
+						ContainerPort: 1900,
+						Protocol:      corev1.ProtocolUDP,
+					},
+					{
+						Name:          "plex",
+						ContainerPort: 32400,
+						Protocol:      corev1.ProtocolTCP,
+					},
+					{
+						Name:          "dlna-tcp",
+						ContainerPort: 32469,
 						Protocol:      corev1.ProtocolTCP,
 					},
 				},

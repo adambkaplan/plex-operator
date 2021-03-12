@@ -199,6 +199,10 @@ func testExternalService(ctx context.Context, plex *v1alpha1.PlexMediaServer) {
 
 	for _, port := range service.Spec.Ports {
 		foundPorts = append(foundPorts, port.Port)
+		if port.Name == "dlna-udp" {
+			Expect(port.Port).To(BeEquivalentTo(1900))
+			Expect(port.Protocol).To(Equal(corev1.ProtocolUDP))
+		}
 		if port.Name == "roku" {
 			Expect(port.Port).To(BeEquivalentTo(8324))
 			Expect(port.Protocol).To(Equal(corev1.ProtocolTCP))
@@ -223,6 +227,10 @@ func testExternalService(ctx context.Context, plex *v1alpha1.PlexMediaServer) {
 			Expect(port.Port).To(BeEquivalentTo(32414))
 			Expect(port.Protocol).To(Equal(corev1.ProtocolUDP))
 		}
+		if port.Name == "dlna-tcp" {
+			Expect(port.Port).To(BeEquivalentTo(32469))
+			Expect(port.Protocol).To(Equal(corev1.ProtocolTCP))
+		}
 	}
 	Expect(foundPorts).To(ContainElement(int32(32400)))
 	if plex.Spec.Networking.EnableDiscovery {
@@ -235,5 +243,8 @@ func testExternalService(ctx context.Context, plex *v1alpha1.PlexMediaServer) {
 	}
 	if plex.Spec.Networking.EnableRoku {
 		Expect(foundPorts).To(ContainElement(int32(8324)))
+	}
+	if plex.Spec.Networking.EnableDLNA {
+		Expect(foundPorts).NotTo(ContainElement(int32(32469)))
 	}
 }

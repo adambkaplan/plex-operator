@@ -158,6 +158,9 @@ func (r *StatefulSetReconciler) renderContainers(plex *plexv1alpha1.PlexMediaSer
 
 func (r *StatefulSetReconciler) renderPlexContainerPorts(plex *v1alpha1.PlexMediaServer, existing []corev1.ContainerPort) []corev1.ContainerPort {
 	containerPorts := []corev1.ContainerPort{}
+	dlnaUDP := corev1.ContainerPort{
+		ContainerPort: 1900,
+	}
 	rokuPort := corev1.ContainerPort{
 		ContainerPort: 8324,
 	}
@@ -176,8 +179,15 @@ func (r *StatefulSetReconciler) renderPlexContainerPorts(plex *v1alpha1.PlexMedi
 	discovery3 := corev1.ContainerPort{
 		ContainerPort: 32414,
 	}
+	dlnaTCP := corev1.ContainerPort{
+		ContainerPort: 32469,
+	}
 
 	for _, port := range existing {
+		if port.ContainerPort == 1900 {
+			dlnaUDP = port
+			continue
+		}
 		if port.ContainerPort == 8324 {
 			rokuPort = port
 			continue
@@ -202,8 +212,18 @@ func (r *StatefulSetReconciler) renderPlexContainerPorts(plex *v1alpha1.PlexMedi
 			discovery3 = port
 			continue
 		}
+		if port.ContainerPort == 32469 {
+			dlnaTCP = port
+			continue
+		}
 		// Append any other ContainerPorts to the returned slice
 		containerPorts = append(containerPorts, port)
+	}
+
+	if plex.Spec.Networking.EnableDLNA {
+		dlnaUDP.Name = "dlna-udp"
+		dlnaUDP.Protocol = corev1.ProtocolUDP
+		containerPorts = append(containerPorts, dlnaUDP)
 	}
 
 	if plex.Spec.Networking.EnableRoku {
@@ -230,6 +250,12 @@ func (r *StatefulSetReconciler) renderPlexContainerPorts(plex *v1alpha1.PlexMedi
 		discovery3.Protocol = corev1.ProtocolUDP
 
 		containerPorts = append(containerPorts, discovery0, discovery1, discovery2, discovery3)
+	}
+
+	if plex.Spec.Networking.EnableDLNA {
+		dlnaTCP.Name = "dlna-tcp"
+		dlnaTCP.Protocol = corev1.ProtocolTCP
+		containerPorts = append(containerPorts, dlnaTCP)
 	}
 
 	return containerPorts

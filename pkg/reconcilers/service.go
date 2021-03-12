@@ -95,6 +95,9 @@ func (r *ServiceReconciler) renderServiceSpec(plex *v1alpha1.PlexMediaServer, ex
 
 func (r *ServiceReconciler) renderServicePorts(plex *v1alpha1.PlexMediaServer, existing []corev1.ServicePort) []corev1.ServicePort {
 	servicePorts := []corev1.ServicePort{}
+	dlnaUDP := corev1.ServicePort{
+		Port: 1900,
+	}
 	rokuPort := corev1.ServicePort{
 		Port: 8324,
 	}
@@ -113,7 +116,14 @@ func (r *ServiceReconciler) renderServicePorts(plex *v1alpha1.PlexMediaServer, e
 	discovery3 := corev1.ServicePort{
 		Port: 32414,
 	}
+	dlnaTCP := corev1.ServicePort{
+		Port: 32469,
+	}
 	for _, port := range existing {
+		if port.Port == 1900 {
+			dlnaUDP = port
+			continue
+		}
 		if port.Port == 8324 {
 			rokuPort = port
 			continue
@@ -138,7 +148,17 @@ func (r *ServiceReconciler) renderServicePorts(plex *v1alpha1.PlexMediaServer, e
 			discovery3 = port
 			continue
 		}
+		if port.Port == 32469 {
+			dlnaTCP = port
+			continue
+		}
 		servicePorts = append(servicePorts, port)
+	}
+
+	if plex.Spec.Networking.EnableDLNA {
+		dlnaUDP.Name = "dlna-udp"
+		dlnaUDP.Protocol = corev1.ProtocolUDP
+		servicePorts = append(servicePorts, dlnaUDP)
 	}
 
 	if plex.Spec.Networking.EnableRoku {
@@ -165,6 +185,12 @@ func (r *ServiceReconciler) renderServicePorts(plex *v1alpha1.PlexMediaServer, e
 		discovery3.Protocol = corev1.ProtocolUDP
 
 		servicePorts = append(servicePorts, discovery0, discovery1, discovery2, discovery3)
+	}
+
+	if plex.Spec.Networking.EnableDLNA {
+		dlnaTCP.Name = "dlna-tcp"
+		dlnaTCP.Protocol = corev1.ProtocolTCP
+		servicePorts = append(servicePorts, dlnaTCP)
 	}
 	return servicePorts
 }
