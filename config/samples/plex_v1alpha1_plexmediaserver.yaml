@@ -1,15 +1,14 @@
 apiVersion: plex.adambkaplan.com/v1alpha1
 kind: PlexMediaServer
 metadata:
-  name: plexmediaserver
+  name: plex
 spec:
   networking:
     externalServiceType: LoadBalancer
+    enableRoku: true
   storage:
     config:
       accessMode: ReadWriteOnce
-      # Storage classes can be specific to your cluster
-      storageClassName: local-path
       capacity: 10Gi
     data:
       accessMode: ReadWriteMany
