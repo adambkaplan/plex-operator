@@ -89,21 +89,67 @@ func (r *ServiceReconciler) renderServiceSpec(plex *v1alpha1.PlexMediaServer, ex
 		"plex.adambkaplan.com/instance": plex.Name,
 	}
 	existingService.ClusterIP = corev1.ClusterIPNone
-	existingService.Ports = r.renderServicePorts(existingService.Ports)
+	existingService.Ports = r.renderServicePorts(plex, existingService.Ports)
 	return existingService
 }
 
-func (r *ServiceReconciler) renderServicePorts(existing []corev1.ServicePort) []corev1.ServicePort {
+func (r *ServiceReconciler) renderServicePorts(plex *v1alpha1.PlexMediaServer, existing []corev1.ServicePort) []corev1.ServicePort {
 	servicePorts := []corev1.ServicePort{}
-	plexPort := corev1.ServicePort{}
+	plexPort := corev1.ServicePort{
+		Port: 32400,
+	}
+	discovery0 := corev1.ServicePort{
+		Port: 32410,
+	}
+	discovery1 := corev1.ServicePort{
+		Port: 32412,
+	}
+	discovery2 := corev1.ServicePort{
+		Port: 32413,
+	}
+	discovery3 := corev1.ServicePort{
+		Port: 32414,
+	}
 	for _, port := range existing {
 		if port.Port == int32(32400) {
 			plexPort = port
+			continue
 		}
+		if port.Port == int32(32410) {
+			discovery0 = port
+			continue
+		}
+		if port.Port == int32(32412) {
+			discovery1 = port
+			continue
+		}
+		if port.Port == int32(32413) {
+			discovery2 = port
+			continue
+		}
+		if port.Port == int32(32414) {
+			discovery3 = port
+			continue
+		}
+		servicePorts = append(servicePorts, port)
 	}
-	plexPort.Port = int32(32400)
 	plexPort.Protocol = corev1.ProtocolTCP
 	plexPort.Name = "plex"
 	servicePorts = append(servicePorts, plexPort)
+	if plex.Spec.Networking.EnableDiscovery {
+		discovery0.Name = "discovery-0"
+		discovery0.Protocol = corev1.ProtocolUDP
+
+		discovery1.Name = "discovery-1"
+		discovery1.Protocol = corev1.ProtocolUDP
+
+		discovery2.Name = "discovery-2"
+		discovery2.Protocol = corev1.ProtocolUDP
+
+		discovery3.Name = "discovery-3"
+		discovery3.Protocol = corev1.ProtocolUDP
+
+		servicePorts = append(servicePorts, discovery0, discovery1, discovery2, discovery3)
+	}
 	return servicePorts
 }

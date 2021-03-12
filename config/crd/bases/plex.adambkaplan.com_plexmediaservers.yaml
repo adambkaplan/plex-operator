@@ -44,6 +44,17 @@ spec:
                 description: Networking configures network options for the Plex Media
                   Server, such as an external-facing service.
                 properties:
+                  enableDNLA:
+                    description: EnableDLNA opens DLNA access ports on all services.
+                    type: boolean
+                  enableDiscovery:
+                    description: EnableDiscovery opens ports necessary for GDM network
+                      discovery
+                    type: boolean
+                  enableRoku:
+                    description: EnableRoku opens Plex Companion ports used to access
+                      Plex via Roku devices.
+                    type: boolean
                   externalServiceType:
                     description: ExternalServiceType configures an external-facing
                       Service for Plex Media Server, in addition to the headless service

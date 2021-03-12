@@ -17,6 +17,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/adambkaplan/plex-operator/api/v1alpha1"
 	plexv1alpha1 "github.com/adambkaplan/plex-operator/api/v1alpha1"
 )
 
@@ -149,27 +150,75 @@ func (r *StatefulSetReconciler) renderContainers(plex *plexv1alpha1.PlexMediaSer
 		version = "latest"
 	}
 	plexContainer.Image = fmt.Sprintf("docker.io/plexinc/pms-docker:%s", version)
-	plexContainer.Ports = r.renderPlexContainerPorts(plexContainer.Ports)
+	plexContainer.Ports = r.renderPlexContainerPorts(plex, plexContainer.Ports)
 	plexContainer.VolumeMounts = r.renderPlexContainerVolumeMounts(plexContainer.VolumeMounts)
 	containers = append(containers, plexContainer)
 	return containers
 }
 
-func (r *StatefulSetReconciler) renderPlexContainerPorts(existing []corev1.ContainerPort) []corev1.ContainerPort {
+func (r *StatefulSetReconciler) renderPlexContainerPorts(plex *v1alpha1.PlexMediaServer, existing []corev1.ContainerPort) []corev1.ContainerPort {
 	containerPorts := []corev1.ContainerPort{}
-	plexPort := corev1.ContainerPort{}
+	plexPort := corev1.ContainerPort{
+		ContainerPort: 32400,
+	}
+	discovery0 := corev1.ContainerPort{
+		ContainerPort: 32410,
+	}
+	discovery1 := corev1.ContainerPort{
+		ContainerPort: 32412,
+	}
+	discovery2 := corev1.ContainerPort{
+		ContainerPort: 32413,
+	}
+	discovery3 := corev1.ContainerPort{
+		ContainerPort: 32414,
+	}
+
 	for _, port := range existing {
 		if port.ContainerPort == int32(32400) {
 			plexPort = port
 			continue
 		}
+		if port.ContainerPort == 32410 {
+			discovery0 = port
+			continue
+		}
+		if port.ContainerPort == 32412 {
+			discovery1 = port
+			continue
+		}
+		if port.ContainerPort == 32413 {
+			discovery2 = port
+			continue
+		}
+		if port.ContainerPort == 32414 {
+			discovery3 = port
+			continue
+		}
 		// Append any other ContainerPorts to the returned slice
 		containerPorts = append(containerPorts, port)
 	}
-	plexPort.ContainerPort = int32(32400)
+
 	plexPort.Name = "plex"
 	plexPort.Protocol = corev1.ProtocolTCP
 	containerPorts = append(containerPorts, plexPort)
+
+	if plex.Spec.Networking.EnableDiscovery {
+		discovery0.Name = "discovery-0"
+		discovery0.Protocol = corev1.ProtocolUDP
+
+		discovery1.Name = "discovery-1"
+		discovery1.Protocol = corev1.ProtocolUDP
+
+		discovery2.Name = "discovery-2"
+		discovery2.Protocol = corev1.ProtocolUDP
+
+		discovery3.Name = "discovery-3"
+		discovery3.Protocol = corev1.ProtocolUDP
+
+		containerPorts = append(containerPorts, discovery0, discovery1, discovery2, discovery3)
+	}
+
 	return containerPorts
 }
 

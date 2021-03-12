@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,8 +20,6 @@ var _ = Describe("Storage options", func() {
 		plex          *v1alpha1.PlexMediaServer
 		testNamespace *v1.Namespace
 		ctx           context.Context
-		retryInterval = 100 * time.Millisecond
-		retryTimeout  = 1 * time.Second
 	)
 
 	JustBeforeEach(func() {

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/suite"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -43,6 +44,143 @@ func (test *serviceReconcileSuite) SetupTest() {
 			},
 			expectedService: serviceDouble("test", "test", serviceDoubleOptions{
 				ClusterIP: corev1.ClusterIPNone,
+			}),
+			expectRequeue: true,
+		},
+		{
+			name: "create with network discovery",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+					Name:      "test",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
+						EnableDiscovery: true,
+					},
+				},
+			},
+			expectedService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+				Ports: []corev1.ServicePort{
+					{
+						Name:     "plex",
+						Port:     32400,
+						Protocol: corev1.ProtocolTCP,
+					},
+					{
+						Name:     "discovery-0",
+						Port:     32410,
+						Protocol: corev1.ProtocolUDP,
+					},
+					{
+						Name:     "discovery-1",
+						Port:     32412,
+						Protocol: corev1.ProtocolUDP,
+					},
+					{
+						Name:     "discovery-2",
+						Port:     32413,
+						Protocol: corev1.ProtocolUDP,
+					},
+					{
+						Name:     "discovery-3",
+						Port:     32414,
+						Protocol: corev1.ProtocolUDP,
+					},
+				},
+			}),
+			expectRequeue: true,
+		},
+		{
+			name: "update add network discovery",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+					Name:      "test",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
+						EnableDiscovery: true,
+					},
+				},
+			},
+			existingService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+			}),
+			expectedService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+				Ports: []corev1.ServicePort{
+					{
+						Name:     "plex",
+						Port:     32400,
+						Protocol: corev1.ProtocolTCP,
+					},
+					{
+						Name:     "discovery-0",
+						Port:     32410,
+						Protocol: corev1.ProtocolUDP,
+					},
+					{
+						Name:     "discovery-1",
+						Port:     32412,
+						Protocol: corev1.ProtocolUDP,
+					},
+					{
+						Name:     "discovery-2",
+						Port:     32413,
+						Protocol: corev1.ProtocolUDP,
+					},
+					{
+						Name:     "discovery-3",
+						Port:     32414,
+						Protocol: corev1.ProtocolUDP,
+					},
+				},
+			}),
+			expectRequeue: true,
+		},
+		{
+			name: "update remove network discovery",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+					Name:      "test",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{},
+			},
+			expectedService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+			}),
+			existingService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+				Ports: []corev1.ServicePort{
+					{
+						Name:     "plex",
+						Port:     32400,
+						Protocol: corev1.ProtocolTCP,
+					},
+					{
+						Name:     "discovery-0",
+						Port:     32410,
+						Protocol: corev1.ProtocolUDP,
+					},
+					{
+						Name:     "discovery-1",
+						Port:     32412,
+						Protocol: corev1.ProtocolUDP,
+					},
+					{
+						Name:     "discovery-2",
+						Port:     32413,
+						Protocol: corev1.ProtocolUDP,
+					},
+					{
+						Name:     "discovery-3",
+						Port:     32414,
+						Protocol: corev1.ProtocolUDP,
+					},
+				},
 			}),
 			expectRequeue: true,
 		},
@@ -96,9 +234,8 @@ func (test *serviceReconcileSuite) TestServiceReconcile() {
 			err = client.Get(ctx, types.NamespacedName{Namespace: tc.plex.Namespace, Name: tc.plex.Name}, updatedService)
 			test.Require().NoError(err, "failed to get Service")
 			test.True(equality.Semantic.DeepEqual(tc.expectedService.Spec, updatedService.Spec),
-				"expected service\n\n%s\n\ndoes not match\n\n%s",
-				tc.expectedService.Spec,
-				updatedService.Spec)
+				"expected service does not match - diff: %s",
+				cmp.Diff(tc.expectedService.Spec, updatedService.Spec))
 		})
 	}
 }
@@ -107,11 +244,21 @@ type serviceDoubleOptions struct {
 	ServiceName string
 	ClusterIP   string
 	ServiceType corev1.ServiceType
+	Ports       []corev1.ServicePort
 }
 
 func serviceDouble(namespace, plexName string, options serviceDoubleOptions) *corev1.Service {
 	if options.ServiceName == "" {
 		options.ServiceName = plexName
+	}
+	if len(options.Ports) == 0 {
+		options.Ports = []corev1.ServicePort{
+			{
+				Name:     "plex",
+				Port:     32400,
+				Protocol: corev1.ProtocolTCP,
+			},
+		}
 	}
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -123,14 +270,8 @@ func serviceDouble(namespace, plexName string, options serviceDoubleOptions) *co
 				"plex.adambkaplan.com/instance": plexName,
 			},
 			ClusterIP: options.ClusterIP,
-			Ports: []corev1.ServicePort{
-				{
-					Name:     "plex",
-					Port:     32400,
-					Protocol: corev1.ProtocolTCP,
-				},
-			},
-			Type: options.ServiceType,
+			Ports:     options.Ports,
+			Type:      options.ServiceType,
 		},
 	}
 

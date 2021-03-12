@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/suite"
 
 	corev1 "k8s.io/api/core/v1"
@@ -232,9 +233,8 @@ func (test *externalServiceReconcileSuite) TestExternalService() {
 			} else {
 				test.Require().NoError(err, "failed to get Service")
 				test.True(equality.Semantic.DeepEqual(tc.expectedService.Spec, updatedService.Spec),
-					"expected service\n\n%s\n\ndoes not match\n\n%s",
-					tc.expectedService.Spec,
-					updatedService.Spec)
+					"expected service does not match - diff: %s",
+					cmp.Diff(tc.expectedService.Spec, updatedService.Spec))
 			}
 		})
 	}

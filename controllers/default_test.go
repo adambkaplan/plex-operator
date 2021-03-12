@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
@@ -25,8 +24,6 @@ var _ = Describe("Default deployment", func() {
 		plexMediaServer *plexv1alpha1.PlexMediaServer
 		testNamespace   *corev1.Namespace
 		ctx             context.Context
-		retryInterval   = 100 * time.Millisecond
-		retryTimeout    = 1 * time.Second
 	)
 
 	JustBeforeEach(func() {

@@ -29,6 +29,7 @@ type statefulSetDoubleOptions struct {
 	Version         string
 	IncludeDefaults bool
 	Ready           bool
+	Ports           []corev1.ContainerPort
 	ConfigVolume    *corev1.PersistentVolumeClaimSpec
 	TranscodeVolume *corev1.PersistentVolumeClaimSpec
 	DataVolume      *corev1.PersistentVolumeClaimSpec
@@ -40,6 +41,13 @@ func doubleStatefulSet(namespace, name string, options statefulSetDoubleOptions)
 	}
 	if options.Ready && options.Replicas < 1 {
 		options.Replicas = 1
+	}
+	if len(options.Ports) == 0 {
+		options.Ports = []corev1.ContainerPort{{
+			Name:          "plex",
+			ContainerPort: 32400,
+			Protocol:      corev1.ProtocolTCP,
+		}}
 	}
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -65,13 +73,7 @@ func doubleStatefulSet(namespace, name string, options statefulSetDoubleOptions)
 						{
 							Name:  "plex",
 							Image: fmt.Sprintf("docker.io/plexinc/pms-docker:%s", options.Version),
-							Ports: []corev1.ContainerPort{
-								{
-									Name:          "plex",
-									ContainerPort: int32(32400),
-									Protocol:      corev1.ProtocolTCP,
-								},
-							},
+							Ports: options.Ports,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "config",
@@ -307,6 +309,51 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 			}),
 		},
 		{
+			name: "create with network discovery",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "create-discovery",
+					Name:      "discovery",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
+						EnableDiscovery: true,
+					},
+				},
+			},
+			expectRequeue: true,
+			expectedStatefulSet: doubleStatefulSet("crate-discovery", "discovery", statefulSetDoubleOptions{
+				Replicas: 1,
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          "plex",
+						ContainerPort: 32400,
+						Protocol:      corev1.ProtocolTCP,
+					},
+					{
+						Name:          "discovery-0",
+						ContainerPort: 32410,
+						Protocol:      corev1.ProtocolUDP,
+					},
+					{
+						Name:          "discovery-1",
+						ContainerPort: 32412,
+						Protocol:      corev1.ProtocolUDP,
+					},
+					{
+						Name:          "discovery-2",
+						ContainerPort: 32413,
+						Protocol:      corev1.ProtocolUDP,
+					},
+					{
+						Name:          "discovery-3",
+						ContainerPort: 32414,
+						Protocol:      corev1.ProtocolUDP,
+					},
+				},
+			}),
+		},
+		{
 			name: "update with version",
 			plex: &v1alpha1.PlexMediaServer{
 				ObjectMeta: metav1.ObjectMeta{
@@ -373,6 +420,105 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 				IncludeDefaults: true,
 			}),
 			expectRequeue: true,
+		},
+		{
+			name:          "update - add network discovery",
+			expectRequeue: true,
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "update-add-discovery",
+					Name:      "discovery",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
+						EnableDiscovery: true,
+					},
+				},
+			},
+			existingStatefulSet: doubleStatefulSet("update-add-discovery", "discovery", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "latest",
+				IncludeDefaults: true,
+			}),
+			expectedStatefulSet: doubleStatefulSet("update-add-discovery", "discovery", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "latest",
+				IncludeDefaults: true,
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          "plex",
+						ContainerPort: 32400,
+						Protocol:      corev1.ProtocolTCP,
+					},
+					{
+						Name:          "discovery-0",
+						ContainerPort: 32410,
+						Protocol:      corev1.ProtocolUDP,
+					},
+					{
+						Name:          "discovery-1",
+						ContainerPort: 32412,
+						Protocol:      corev1.ProtocolUDP,
+					},
+					{
+						Name:          "discovery-2",
+						ContainerPort: 32413,
+						Protocol:      corev1.ProtocolUDP,
+					},
+					{
+						Name:          "discovery-3",
+						ContainerPort: 32414,
+						Protocol:      corev1.ProtocolUDP,
+					},
+				},
+			}),
+		},
+		{
+			name:          "update - remove network discovery",
+			expectRequeue: true,
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "update-rm-discovery",
+					Name:      "discovery",
+				},
+			},
+			expectedStatefulSet: doubleStatefulSet("update-rm-discovery", "discovery", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "latest",
+				IncludeDefaults: true,
+			}),
+			existingStatefulSet: doubleStatefulSet("update-rm-discovery", "discovery", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "latest",
+				IncludeDefaults: true,
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          "plex",
+						ContainerPort: 32400,
+						Protocol:      corev1.ProtocolTCP,
+					},
+					{
+						Name:          "discovery-0",
+						ContainerPort: 32410,
+						Protocol:      corev1.ProtocolUDP,
+					},
+					{
+						Name:          "discovery-1",
+						ContainerPort: 32412,
+						Protocol:      corev1.ProtocolUDP,
+					},
+					{
+						Name:          "discovery-2",
+						ContainerPort: 32413,
+						Protocol:      corev1.ProtocolUDP,
+					},
+					{
+						Name:          "discovery-3",
+						ContainerPort: 32414,
+						Protocol:      corev1.ProtocolUDP,
+					},
+				},
+			}),
 		},
 		{
 			name: "no change",

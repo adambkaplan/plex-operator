@@ -112,19 +112,21 @@ func (r *ExternalServiceReconciler) renderServiceSpec(plex *v1alpha1.PlexMediaSe
 	}
 	// TODO: Update invalid fields if we transition from NodePort -> LoadBalancer, and vice versa
 	existingService.Type = plex.Spec.Networking.ExternalServiceType
-	existingService.Ports = r.renderServicePorts(existingService.Ports)
+	existingService.Ports = r.renderServicePorts(plex, existingService.Ports)
 	return existingService
 }
 
-func (r *ExternalServiceReconciler) renderServicePorts(existing []corev1.ServicePort) []corev1.ServicePort {
+func (r *ExternalServiceReconciler) renderServicePorts(plex *v1alpha1.PlexMediaServer, existing []corev1.ServicePort) []corev1.ServicePort {
 	servicePorts := []corev1.ServicePort{}
-	plexPort := corev1.ServicePort{}
+	plexPort := corev1.ServicePort{
+		Port: 32400,
+	}
 	for _, port := range existing {
-		if port.Port == int32(32400) {
+		if port.Port == 32400 {
 			plexPort = port
 		}
 	}
-	plexPort.Port = int32(32400)
+
 	plexPort.Protocol = corev1.ProtocolTCP
 	plexPort.Name = "plex"
 	servicePorts = append(servicePorts, plexPort)

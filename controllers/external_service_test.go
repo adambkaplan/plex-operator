@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -15,17 +14,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/adambkaplan/plex-operator/api/v1alpha1"
-	plexv1alpha1 "github.com/adambkaplan/plex-operator/api/v1alpha1"
 )
 
 var _ = Describe("External Service", func() {
 
 	var (
-		plex          *plexv1alpha1.PlexMediaServer
+		plex          *v1alpha1.PlexMediaServer
 		testNamespace *corev1.Namespace
 		ctx           context.Context
-		retryInterval = 100 * time.Microsecond
-		retryTimeout  = 1 * time.Second
 	)
 
 	JustBeforeEach(func() {
@@ -39,13 +35,13 @@ var _ = Describe("External Service", func() {
 	When("a LoadBalancer external service is enabled", func() {
 
 		BeforeEach(func() {
-			plex = &plexv1alpha1.PlexMediaServer{
+			plex = &v1alpha1.PlexMediaServer{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: RandomName("external-service"),
 					Name:      "plex",
 				},
-				Spec: plexv1alpha1.PlexMediaServerSpec{
-					Networking: plexv1alpha1.PlexNetworkSpec{
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
 						ExternalServiceType: corev1.ServiceTypeLoadBalancer,
 					},
 				},
@@ -53,14 +49,14 @@ var _ = Describe("External Service", func() {
 		})
 
 		It("creates a LoadBalancer service to send traffic to the Plex Media Server", func() {
-			testExternalService(ctx, plex, retryTimeout, retryInterval)
+			testExternalService(ctx, plex)
 		})
 
 		It("updates the service to NodePort if the external service type is later changed to NodePort", func() {
-			testExternalService(ctx, plex, retryTimeout, retryInterval)
+			testExternalService(ctx, plex)
 			var err error
 			Eventually(func() bool {
-				currentPlex := &plexv1alpha1.PlexMediaServer{}
+				currentPlex := &v1alpha1.PlexMediaServer{}
 				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: plex.Name}, currentPlex)
 				if err != nil {
 					return true
@@ -84,10 +80,10 @@ var _ = Describe("External Service", func() {
 		})
 
 		It("deletes the service if the external service type is later removed", func() {
-			testExternalService(ctx, plex, retryTimeout, retryInterval)
+			testExternalService(ctx, plex)
 			var err error
 			Eventually(func() bool {
-				currentPlex := &plexv1alpha1.PlexMediaServer{}
+				currentPlex := &v1alpha1.PlexMediaServer{}
 				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: plex.Name}, currentPlex)
 				if err != nil {
 					return true
@@ -111,13 +107,13 @@ var _ = Describe("External Service", func() {
 	When("a NodePort external service is enabled", func() {
 
 		BeforeEach(func() {
-			plex = &plexv1alpha1.PlexMediaServer{
+			plex = &v1alpha1.PlexMediaServer{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: RandomName("external-service"),
 					Name:      "plex",
 				},
-				Spec: plexv1alpha1.PlexMediaServerSpec{
-					Networking: plexv1alpha1.PlexNetworkSpec{
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
 						ExternalServiceType: corev1.ServiceTypeNodePort,
 					},
 				},
@@ -125,14 +121,14 @@ var _ = Describe("External Service", func() {
 		})
 
 		It("creates a NodePort service to send traffic to the Plex Media Server", func() {
-			testExternalService(ctx, plex, retryTimeout, retryInterval)
+			testExternalService(ctx, plex)
 		})
 
 		It("updates the service to LoadBalancer if the external service type is later changed to LoadBalancer", func() {
-			testExternalService(ctx, plex, retryTimeout, retryInterval)
+			testExternalService(ctx, plex)
 			var err error
 			Eventually(func() bool {
-				currentPlex := &plexv1alpha1.PlexMediaServer{}
+				currentPlex := &v1alpha1.PlexMediaServer{}
 				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: plex.Name}, currentPlex)
 				if err != nil {
 					return true
@@ -157,10 +153,10 @@ var _ = Describe("External Service", func() {
 		})
 
 		It("deletes the service if the external service type is later removed", func() {
-			testExternalService(ctx, plex, retryTimeout, retryInterval)
+			testExternalService(ctx, plex)
 			var err error
 			Eventually(func() bool {
-				currentPlex := &plexv1alpha1.PlexMediaServer{}
+				currentPlex := &v1alpha1.PlexMediaServer{}
 				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: plex.Namespace, Name: plex.Name}, currentPlex)
 				if err != nil {
 					return true
@@ -182,7 +178,7 @@ var _ = Describe("External Service", func() {
 	})
 })
 
-func testExternalService(ctx context.Context, plex *v1alpha1.PlexMediaServer, retryTimeout, retryInterval time.Duration) {
+func testExternalService(ctx context.Context, plex *v1alpha1.PlexMediaServer) {
 	service := &corev1.Service{}
 	By("finding the external service")
 	Eventually(func() bool {
@@ -199,14 +195,38 @@ func testExternalService(ctx context.Context, plex *v1alpha1.PlexMediaServer, re
 	Expect(service.Spec.Selector).To(BeEquivalentTo(map[string]string{
 		"plex.adambkaplan.com/instance": plex.Name,
 	}))
-	foundPlex := false
+	foundPorts := []int32{}
+
 	for _, port := range service.Spec.Ports {
+		foundPorts = append(foundPorts, port.Port)
 		if port.Name == "plex" {
-			foundPlex = true
 			Expect(port.Port).To(BeEquivalentTo(32400))
 			Expect(port.Protocol).To(Equal(corev1.ProtocolTCP))
-			break
+		}
+		if port.Name == "discovery-0" {
+			Expect(port.Port).To(BeEquivalentTo(32410))
+			Expect(port.Protocol).To(Equal(corev1.ProtocolUDP))
+		}
+		if port.Name == "discovery-1" {
+			Expect(port.Port).To(BeEquivalentTo(32412))
+			Expect(port.Protocol).To(Equal(corev1.ProtocolUDP))
+		}
+		if port.Name == "discovery-2" {
+			Expect(port.Port).To(BeEquivalentTo(32413))
+			Expect(port.Protocol).To(Equal(corev1.ProtocolUDP))
+		}
+		if port.Name == "discovery-3" {
+			Expect(port.Port).To(BeEquivalentTo(32414))
+			Expect(port.Protocol).To(Equal(corev1.ProtocolUDP))
 		}
 	}
-	Expect(foundPlex).To(BeTrue())
+	Expect(foundPorts).To(ContainElement(int32(32400)))
+	if plex.Spec.Networking.EnableDiscovery {
+		// UDP ports cannot be exposed on a TCP load balancer
+		// NOTE - this can be fixed with k8s v1.20!
+		Expect(foundPorts).NotTo(ContainElement(int32(32410)))
+		Expect(foundPorts).NotTo(ContainElement(int32(32412)))
+		Expect(foundPorts).NotTo(ContainElement(int32(32413)))
+		Expect(foundPorts).NotTo(ContainElement(int32(32414)))
+	}
 }

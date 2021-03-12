@@ -1,7 +1,21 @@
 apiVersion: plex.adambkaplan.com/v1alpha1
 kind: PlexMediaServer
 metadata:
-  name: plexmediaserver-sample
+  name: plexmediaserver
 spec:
-  # Add fields here
-  foo: bar
+  networking:
+    externalServiceType: LoadBalancer
+  storage:
+    config:
+      accessMode: ReadWriteOnce
+      # Storage classes can be specific to your cluster
+      storageClassName: local-path
+      capacity: 10Gi
+    data:
+      accessMode: ReadWriteMany
+      # Storage classes can be specific to your cluster
+      storageClassName: nfs
+      capacity: 100Gi
+      selector:
+        matchLabels:
+          media: plex

@@ -90,6 +90,18 @@ type PlexNetworkSpec struct {
 	// +optional
 	// +kubebuilder:validation:Enum=NodePort;LoadBalancer
 	ExternalServiceType corev1.ServiceType `json:"externalServiceType,omitempty"`
+
+	// EnableDiscovery opens ports necessary for GDM network discovery
+	// +optional
+	EnableDiscovery bool `json:"enableDiscovery,omitempty"`
+
+	// EnableDLNA opens DLNA access ports on all services.
+	// +optional
+	EnableDLNA bool `json:"enableDNLA,omitempty"`
+
+	// EnableRoku opens Plex Companion ports used to access Plex via Roku devices.
+	// +optional
+	EnableRoku bool `json:"enableRoku,omitempty"`
 }
 
 // PlexMediaServerStatus defines the observed state of PlexMediaServer

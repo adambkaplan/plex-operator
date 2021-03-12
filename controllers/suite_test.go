@@ -9,6 +9,7 @@ package controllers
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -31,6 +32,8 @@ import (
 var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
+var retryInterval = 100 * time.Millisecond
+var retryTimeout = 1 * time.Second
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
