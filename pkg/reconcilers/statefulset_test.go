@@ -354,6 +354,36 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 			}),
 		},
 		{
+			name: "create with roku",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "create-roku",
+					Name:      "roku",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
+						EnableRoku: true,
+					},
+				},
+			},
+			expectRequeue: true,
+			expectedStatefulSet: doubleStatefulSet("create-roku", "roku", statefulSetDoubleOptions{
+				Replicas: 1,
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          "roku",
+						ContainerPort: 8324,
+						Protocol:      corev1.ProtocolTCP,
+					},
+					{
+						Name:          "plex",
+						ContainerPort: 32400,
+						Protocol:      corev1.ProtocolTCP,
+					},
+				},
+			}),
+		},
+		{
 			name: "update with version",
 			plex: &v1alpha1.PlexMediaServer{
 				ObjectMeta: metav1.ObjectMeta{
@@ -422,7 +452,7 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 			expectRequeue: true,
 		},
 		{
-			name:          "update - add network discovery",
+			name:          "update add network discovery",
 			expectRequeue: true,
 			plex: &v1alpha1.PlexMediaServer{
 				ObjectMeta: metav1.ObjectMeta{
@@ -474,7 +504,7 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 			}),
 		},
 		{
-			name:          "update - remove network discovery",
+			name:          "update remove network discovery",
 			expectRequeue: true,
 			plex: &v1alpha1.PlexMediaServer{
 				ObjectMeta: metav1.ObjectMeta{
@@ -516,6 +546,75 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 						Name:          "discovery-3",
 						ContainerPort: 32414,
 						Protocol:      corev1.ProtocolUDP,
+					},
+				},
+			}),
+		},
+		{
+			name:          "update add roku",
+			expectRequeue: true,
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "update-add-roku",
+					Name:      "roku",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
+						EnableRoku: true,
+					},
+				},
+			},
+			existingStatefulSet: doubleStatefulSet("update-add-roku", "roku", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "latest",
+				IncludeDefaults: true,
+			}),
+			expectedStatefulSet: doubleStatefulSet("update-add-roku", "roku", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "latest",
+				IncludeDefaults: true,
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          "roku",
+						ContainerPort: 8324,
+						Protocol:      corev1.ProtocolTCP,
+					},
+					{
+						Name:          "plex",
+						ContainerPort: 32400,
+						Protocol:      corev1.ProtocolTCP,
+					},
+				},
+			}),
+		},
+		{
+			name:          "update remove roku",
+			expectRequeue: true,
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "update-rm-roku",
+					Name:      "roku",
+				},
+			},
+			expectedStatefulSet: doubleStatefulSet("update-rm-roku", "roku", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "latest",
+				IncludeDefaults: true,
+			}),
+			existingStatefulSet: doubleStatefulSet("update-rm-roku", "roku", statefulSetDoubleOptions{
+				Replicas:        1,
+				Version:         "latest",
+				IncludeDefaults: true,
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          "roku",
+						ContainerPort: 8324,
+						Protocol:      corev1.ProtocolTCP,
+					},
+					{
+						Name:          "plex",
+						ContainerPort: 32400,
+						Protocol:      corev1.ProtocolTCP,
 					},
 				},
 			}),

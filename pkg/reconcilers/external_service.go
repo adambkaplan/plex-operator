@@ -118,13 +118,25 @@ func (r *ExternalServiceReconciler) renderServiceSpec(plex *v1alpha1.PlexMediaSe
 
 func (r *ExternalServiceReconciler) renderServicePorts(plex *v1alpha1.PlexMediaServer, existing []corev1.ServicePort) []corev1.ServicePort {
 	servicePorts := []corev1.ServicePort{}
+	rokuPort := corev1.ServicePort{
+		Port: 8324,
+	}
 	plexPort := corev1.ServicePort{
 		Port: 32400,
 	}
 	for _, port := range existing {
+		if port.Port == 8324 {
+			rokuPort = port
+		}
 		if port.Port == 32400 {
 			plexPort = port
 		}
+	}
+
+	if plex.Spec.Networking.EnableRoku {
+		rokuPort.Name = "roku"
+		rokuPort.Protocol = corev1.ProtocolTCP
+		servicePorts = append(servicePorts, rokuPort)
 	}
 
 	plexPort.Protocol = corev1.ProtocolTCP

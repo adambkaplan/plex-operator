@@ -104,6 +104,38 @@ func (test *externalServiceReconcileSuite) SetupTest() {
 			expectRequeue: true,
 		},
 		{
+			name: "create LoadBalancer with roku",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "create",
+					Name:      "create-lb",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
+						EnableRoku:          true,
+						ExternalServiceType: corev1.ServiceTypeLoadBalancer,
+					},
+				},
+			},
+			expectedService: serviceDouble("create", "create-lb", serviceDoubleOptions{
+				ServiceName: "create-lb-ext",
+				ServiceType: corev1.ServiceTypeLoadBalancer,
+				Ports: []corev1.ServicePort{
+					{
+						Port:     8324,
+						Name:     "roku",
+						Protocol: corev1.ProtocolTCP,
+					},
+					{
+						Port:     32400,
+						Name:     "plex",
+						Protocol: corev1.ProtocolTCP,
+					},
+				},
+			}),
+			expectRequeue: true,
+		},
+		{
 			name: "transition LoadBalancer to NodePort",
 			plex: &v1alpha1.PlexMediaServer{
 				ObjectMeta: metav1.ObjectMeta{
@@ -146,6 +178,76 @@ func (test *externalServiceReconcileSuite) SetupTest() {
 			expectedService: serviceDouble("create", "update-lb", serviceDoubleOptions{
 				ServiceName: "update-lb-ext",
 				ServiceType: corev1.ServiceTypeLoadBalancer,
+			}),
+			expectRequeue: true,
+		},
+		{name: "update LoadBalancer add roku",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "update",
+					Name:      "roku",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
+						EnableRoku:          true,
+						ExternalServiceType: corev1.ServiceTypeLoadBalancer,
+					},
+				},
+			},
+			existingService: serviceDouble("update", "roku", serviceDoubleOptions{
+				ServiceName: "roku-ext",
+				ServiceType: corev1.ServiceTypeLoadBalancer,
+			}),
+			expectedService: serviceDouble("update", "roku", serviceDoubleOptions{
+				ServiceName: "roku-ext",
+				ServiceType: corev1.ServiceTypeLoadBalancer,
+				Ports: []corev1.ServicePort{
+					{
+						Port:     8324,
+						Name:     "roku",
+						Protocol: corev1.ProtocolTCP,
+					},
+					{
+						Port:     32400,
+						Name:     "plex",
+						Protocol: corev1.ProtocolTCP,
+					},
+				},
+			}),
+			expectRequeue: true,
+		},
+		{
+			name: "update LoadBalancer remove roku",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "update",
+					Name:      "roku",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
+						ExternalServiceType: corev1.ServiceTypeLoadBalancer,
+					},
+				},
+			},
+			expectedService: serviceDouble("update", "roku", serviceDoubleOptions{
+				ServiceName: "roku-ext",
+				ServiceType: corev1.ServiceTypeLoadBalancer,
+			}),
+			existingService: serviceDouble("update", "roku", serviceDoubleOptions{
+				ServiceName: "roku-ext",
+				ServiceType: corev1.ServiceTypeLoadBalancer,
+				Ports: []corev1.ServicePort{
+					{
+						Port:     8324,
+						Name:     "roku",
+						Protocol: corev1.ProtocolTCP,
+					},
+					{
+						Port:     32400,
+						Name:     "plex",
+						Protocol: corev1.ProtocolTCP,
+					},
+				},
 			}),
 			expectRequeue: true,
 		},

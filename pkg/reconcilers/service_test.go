@@ -93,6 +93,36 @@ func (test *serviceReconcileSuite) SetupTest() {
 			expectRequeue: true,
 		},
 		{
+			name: "create with roku",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+					Name:      "test",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
+						EnableRoku: true,
+					},
+				},
+			},
+			expectedService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+				Ports: []corev1.ServicePort{
+					{
+						Name:     "roku",
+						Port:     8324,
+						Protocol: corev1.ProtocolTCP,
+					},
+					{
+						Name:     "plex",
+						Port:     32400,
+						Protocol: corev1.ProtocolTCP,
+					},
+				},
+			}),
+			expectRequeue: true,
+		},
+		{
 			name: "update add network discovery",
 			plex: &v1alpha1.PlexMediaServer{
 				ObjectMeta: metav1.ObjectMeta{
@@ -179,6 +209,68 @@ func (test *serviceReconcileSuite) SetupTest() {
 						Name:     "discovery-3",
 						Port:     32414,
 						Protocol: corev1.ProtocolUDP,
+					},
+				},
+			}),
+			expectRequeue: true,
+		},
+		{
+			name: "update add roku",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+					Name:      "test",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					Networking: v1alpha1.PlexNetworkSpec{
+						EnableRoku: true,
+					},
+				},
+			},
+			existingService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+			}),
+			expectedService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+				Ports: []corev1.ServicePort{
+					{
+						Name:     "roku",
+						Port:     8324,
+						Protocol: corev1.ProtocolTCP,
+					},
+					{
+						Name:     "plex",
+						Port:     32400,
+						Protocol: corev1.ProtocolTCP,
+					},
+				},
+			}),
+			expectRequeue: true,
+		},
+		{
+			name: "update remove roku",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+					Name:      "test",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{},
+			},
+			expectedService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+			}),
+			existingService: serviceDouble("test", "test", serviceDoubleOptions{
+				ClusterIP: corev1.ClusterIPNone,
+				Ports: []corev1.ServicePort{
+					{
+						Name:     "roku",
+						Port:     8324,
+						Protocol: corev1.ProtocolTCP,
+					},
+					{
+						Name:     "plex",
+						Port:     32400,
+						Protocol: corev1.ProtocolTCP,
 					},
 				},
 			}),

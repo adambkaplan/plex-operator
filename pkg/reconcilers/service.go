@@ -95,6 +95,9 @@ func (r *ServiceReconciler) renderServiceSpec(plex *v1alpha1.PlexMediaServer, ex
 
 func (r *ServiceReconciler) renderServicePorts(plex *v1alpha1.PlexMediaServer, existing []corev1.ServicePort) []corev1.ServicePort {
 	servicePorts := []corev1.ServicePort{}
+	rokuPort := corev1.ServicePort{
+		Port: 8324,
+	}
 	plexPort := corev1.ServicePort{
 		Port: 32400,
 	}
@@ -111,30 +114,42 @@ func (r *ServiceReconciler) renderServicePorts(plex *v1alpha1.PlexMediaServer, e
 		Port: 32414,
 	}
 	for _, port := range existing {
-		if port.Port == int32(32400) {
+		if port.Port == 8324 {
+			rokuPort = port
+			continue
+		}
+		if port.Port == 32400 {
 			plexPort = port
 			continue
 		}
-		if port.Port == int32(32410) {
+		if port.Port == 32410 {
 			discovery0 = port
 			continue
 		}
-		if port.Port == int32(32412) {
+		if port.Port == 32412 {
 			discovery1 = port
 			continue
 		}
-		if port.Port == int32(32413) {
+		if port.Port == 32413 {
 			discovery2 = port
 			continue
 		}
-		if port.Port == int32(32414) {
+		if port.Port == 32414 {
 			discovery3 = port
 			continue
 		}
 		servicePorts = append(servicePorts, port)
 	}
-	plexPort.Protocol = corev1.ProtocolTCP
+
+	if plex.Spec.Networking.EnableRoku {
+		rokuPort.Name = "roku"
+		rokuPort.Protocol = corev1.ProtocolTCP
+		servicePorts = append(servicePorts, rokuPort)
+	}
+
 	plexPort.Name = "plex"
+	plexPort.Protocol = corev1.ProtocolTCP
+
 	servicePorts = append(servicePorts, plexPort)
 	if plex.Spec.Networking.EnableDiscovery {
 		discovery0.Name = "discovery-0"

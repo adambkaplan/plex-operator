@@ -158,6 +158,9 @@ func (r *StatefulSetReconciler) renderContainers(plex *plexv1alpha1.PlexMediaSer
 
 func (r *StatefulSetReconciler) renderPlexContainerPorts(plex *v1alpha1.PlexMediaServer, existing []corev1.ContainerPort) []corev1.ContainerPort {
 	containerPorts := []corev1.ContainerPort{}
+	rokuPort := corev1.ContainerPort{
+		ContainerPort: 8324,
+	}
 	plexPort := corev1.ContainerPort{
 		ContainerPort: 32400,
 	}
@@ -175,7 +178,11 @@ func (r *StatefulSetReconciler) renderPlexContainerPorts(plex *v1alpha1.PlexMedi
 	}
 
 	for _, port := range existing {
-		if port.ContainerPort == int32(32400) {
+		if port.ContainerPort == 8324 {
+			rokuPort = port
+			continue
+		}
+		if port.ContainerPort == 32400 {
 			plexPort = port
 			continue
 		}
@@ -197,6 +204,12 @@ func (r *StatefulSetReconciler) renderPlexContainerPorts(plex *v1alpha1.PlexMedi
 		}
 		// Append any other ContainerPorts to the returned slice
 		containerPorts = append(containerPorts, port)
+	}
+
+	if plex.Spec.Networking.EnableRoku {
+		rokuPort.Name = "roku"
+		rokuPort.Protocol = corev1.ProtocolTCP
+		containerPorts = append(containerPorts, rokuPort)
 	}
 
 	plexPort.Name = "plex"

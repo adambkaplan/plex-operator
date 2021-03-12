@@ -199,6 +199,10 @@ func testExternalService(ctx context.Context, plex *v1alpha1.PlexMediaServer) {
 
 	for _, port := range service.Spec.Ports {
 		foundPorts = append(foundPorts, port.Port)
+		if port.Name == "roku" {
+			Expect(port.Port).To(BeEquivalentTo(8324))
+			Expect(port.Protocol).To(Equal(corev1.ProtocolTCP))
+		}
 		if port.Name == "plex" {
 			Expect(port.Port).To(BeEquivalentTo(32400))
 			Expect(port.Protocol).To(Equal(corev1.ProtocolTCP))
@@ -223,10 +227,13 @@ func testExternalService(ctx context.Context, plex *v1alpha1.PlexMediaServer) {
 	Expect(foundPorts).To(ContainElement(int32(32400)))
 	if plex.Spec.Networking.EnableDiscovery {
 		// UDP ports cannot be exposed on a TCP load balancer
-		// NOTE - this can be fixed with k8s v1.20!
+		// NOTE - this can be fixed when multi-protocol LoadBalancers are beta in k8s
 		Expect(foundPorts).NotTo(ContainElement(int32(32410)))
 		Expect(foundPorts).NotTo(ContainElement(int32(32412)))
 		Expect(foundPorts).NotTo(ContainElement(int32(32413)))
 		Expect(foundPorts).NotTo(ContainElement(int32(32414)))
+	}
+	if plex.Spec.Networking.EnableRoku {
+		Expect(foundPorts).To(ContainElement(int32(8324)))
 	}
 }
