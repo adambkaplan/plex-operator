@@ -27,6 +27,7 @@ import (
 type statefulSetDoubleOptions struct {
 	Replicas        int32
 	Version         string
+	ClaimToken      string
 	IncludeDefaults bool
 	Ready           bool
 	Ports           []corev1.ContainerPort
@@ -73,6 +74,12 @@ func doubleStatefulSet(namespace, name string, options statefulSetDoubleOptions)
 						{
 							Name:  "plex",
 							Image: fmt.Sprintf("docker.io/plexinc/pms-docker:%s", options.Version),
+							Env: []corev1.EnvVar{
+								{
+									Name:  "PLEX_CLAIM",
+									Value: options.ClaimToken,
+								},
+							},
 							Ports: options.Ports,
 							VolumeMounts: []corev1.VolumeMount{
 								{
@@ -204,6 +211,23 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 			expectedStatefulSet: doubleStatefulSet("test", "test-version", statefulSetDoubleOptions{
 				Replicas: 1,
 				Version:  "v1.21",
+			}),
+		},
+		{
+			name: "create with claim token",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+					Name:      "test-version",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					ClaimToken: "CHANGEME",
+				},
+			},
+			expectRequeue: true,
+			expectedStatefulSet: doubleStatefulSet("test", "test-version", statefulSetDoubleOptions{
+				Replicas:   1,
+				ClaimToken: "CHANGEME",
 			}),
 		},
 		{
@@ -460,6 +484,28 @@ func (test *statefulSetReconcileSuite) SetupTest() {
 				IncludeDefaults: true,
 			}),
 			expectError:   false,
+			expectRequeue: true,
+		},
+		{
+			name: "update claim token",
+			plex: &v1alpha1.PlexMediaServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "update",
+					Name:      "update-token",
+				},
+				Spec: v1alpha1.PlexMediaServerSpec{
+					ClaimToken: "CHANGEME",
+				},
+			},
+			existingStatefulSet: doubleStatefulSet("update", "update-token", statefulSetDoubleOptions{
+				Replicas:        1,
+				IncludeDefaults: true,
+			}),
+			expectedStatefulSet: doubleStatefulSet("update", "update-token", statefulSetDoubleOptions{
+				Replicas:        1,
+				ClaimToken:      "CHANGEME",
+				IncludeDefaults: true,
+			}),
 			expectRequeue: true,
 		},
 		{

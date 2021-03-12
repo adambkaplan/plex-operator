@@ -43,6 +43,7 @@ var _ = Describe("Default deployment", func() {
 					Name:      "plex-server",
 				},
 				Spec: plexv1alpha1.PlexMediaServerSpec{
+					Version:    "v1.21.45",
 					ClaimToken: "CHANGEME",
 				},
 			}
@@ -73,6 +74,14 @@ var _ = Describe("Default deployment", func() {
 				expectedVersion = "latest"
 			}
 			Expect(firstContainer.Image).To(Equal(fmt.Sprintf("docker.io/plexinc/pms-docker:%s", expectedVersion)))
+			foundClaimEnv := false
+			for _, env := range firstContainer.Env {
+				if env.Name == "PLEX_CLAIM" {
+					foundClaimEnv = true
+					Expect(env.Value).To(Equal(plexMediaServer.Spec.ClaimToken))
+				}
+			}
+			Expect(foundClaimEnv).To(BeTrue())
 			foundConfig := false
 			foundTranscode := false
 			foundData := false

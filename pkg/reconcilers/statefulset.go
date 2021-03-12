@@ -150,10 +150,28 @@ func (r *StatefulSetReconciler) renderContainers(plex *plexv1alpha1.PlexMediaSer
 		version = "latest"
 	}
 	plexContainer.Image = fmt.Sprintf("docker.io/plexinc/pms-docker:%s", version)
+	plexContainer.Env = r.renderPlexEnv(plex, plexContainer.Env)
 	plexContainer.Ports = r.renderPlexContainerPorts(plex, plexContainer.Ports)
 	plexContainer.VolumeMounts = r.renderPlexContainerVolumeMounts(plexContainer.VolumeMounts)
 	containers = append(containers, plexContainer)
 	return containers
+}
+
+func (r *StatefulSetReconciler) renderPlexEnv(plex *v1alpha1.PlexMediaServer, existing []corev1.EnvVar) []corev1.EnvVar {
+	claimEnv := corev1.EnvVar{
+		Name: "PLEX_CLAIM",
+	}
+	envVars := []corev1.EnvVar{}
+	for _, env := range existing {
+		if env.Name == "PLEX_CLAIM" {
+			claimEnv = env
+			continue
+		}
+		envVars = append(envVars, env)
+	}
+	claimEnv.Value = plex.Spec.ClaimToken
+	envVars = append(envVars, claimEnv)
+	return envVars
 }
 
 func (r *StatefulSetReconciler) renderPlexContainerPorts(plex *v1alpha1.PlexMediaServer, existing []corev1.ContainerPort) []corev1.ContainerPort {
