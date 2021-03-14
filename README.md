@@ -39,6 +39,8 @@ Read [Deploy Plex](docs/deploy-plex.md) to see which configuration options are a
 I am not the first person to create a Kubernetes operator for Plex.
 A lot of this work was inspired by [kubealex/k8s-mediaserver-operator](https://github.com/kubealex/k8s-mediaserver-operator) and [munnerz/kube-plex](https://github.com/munnerz/kube-plex).
 
+Read the [FAQ](docs/faq.md) to understand why I decided to write this particular operator.
+
 ## Contributing
 
 This project is mainly for my enjoyment and experimentation with operator-sdk.
